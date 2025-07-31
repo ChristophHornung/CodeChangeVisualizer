@@ -266,10 +266,5 @@ paket-files/
 # Python Tools for Visual Studio (PTVS)
 __pycache__/
 *.pyc
-/quantum.playlist
-/miniEFX.playlist
-/Byk.Instruments.Tests/Byk.Instruments.Tests.ruleset
-/Byk.Instruments.miniEFX.Tests/Byk.Instruments.miniEFX.Tests.ruleset
-/microTriColor.playlist
-/Documentation/docfx_project/_exported_templates
-/Byk.Data.Math/out/
+
+/Playground/

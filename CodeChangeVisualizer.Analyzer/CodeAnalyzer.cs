@@ -2,12 +2,24 @@ namespace CodeChangeVisualizer.Analyzer;
 
 public class CodeAnalyzer
 {
-	public async Task<List<FileAnalysis>> AnalyzeDirectoryAsync(string directoryPath)
+	public async Task<List<FileAnalysis>> AnalyzeDirectoryAsync(string directoryPath, List<string>? ignorePatterns = null, List<string>? fileExtensions = null)
 	{
 		List<FileAnalysis> results = [];
-		string[] csharpFiles = Directory.GetFiles(directoryPath, "*.cs", SearchOption.AllDirectories);
+		
+		// Default to C# files if no extensions specified
+		fileExtensions ??= new List<string> { "*.cs" };
+		
+		// Get all files matching the specified extensions
+		List<string> allFiles = new();
+		foreach (string extension in fileExtensions)
+		{
+			allFiles.AddRange(Directory.GetFiles(directoryPath, extension, SearchOption.AllDirectories));
+		}
 
-		foreach (string filePath in csharpFiles)
+		// Filter files based on ignore patterns
+		List<string> filteredFiles = this.FilterFiles(allFiles, directoryPath, ignorePatterns);
+
+		foreach (string filePath in filteredFiles)
 		{
 			string relativePath = Path.GetRelativePath(directoryPath, filePath);
 			FileAnalysis fileAnalysis = await this.AnalyzeFileAsync(filePath, relativePath);
@@ -15,6 +27,46 @@ public class CodeAnalyzer
 		}
 
 		return results;
+	}
+
+	private List<string> FilterFiles(List<string> files, string baseDirectory, List<string>? ignorePatterns)
+	{
+		if (ignorePatterns == null || ignorePatterns.Count == 0)
+		{
+			return files;
+		}
+
+		List<string> filteredFiles = new();
+		
+		foreach (string filePath in files)
+		{
+			string relativePath = Path.GetRelativePath(baseDirectory, filePath).Replace('\\', '/');
+			bool shouldInclude = true;
+
+			foreach (string pattern in ignorePatterns)
+			{
+				try
+				{
+					if (System.Text.RegularExpressions.Regex.IsMatch(relativePath, pattern))
+					{
+						shouldInclude = false;
+						break;
+					}
+				}
+				catch (ArgumentException)
+				{
+					// Invalid regex pattern, skip it
+					continue;
+				}
+			}
+
+			if (shouldInclude)
+			{
+				filteredFiles.Add(filePath);
+			}
+		}
+
+		return filteredFiles;
 	}
 
 	public async Task<FileAnalysis> AnalyzeFileAsync(Stream stream, string relativePath)
