@@ -168,7 +168,7 @@ public class LineTypeDetectionTests
 
 		// Analyze the stream directly
 		FileAnalysis fileResult = this.analyzer.AnalyzeFileAsync(memoryStream, "test.cs").Result;
-		
+
 		if (fileResult.Lines.Any())
 		{
 			return fileResult.Lines.First().Type;

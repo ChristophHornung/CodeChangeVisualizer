@@ -128,7 +128,8 @@ public class CodeVisualizer
 		canvas.Restore();
 
 		// Draw separator line
-		canvas.DrawLine(x, textAreaHeight, x + CodeVisualizer.StackWidth, textAreaHeight, new SKPaint { Color = SKColors.Gray });
+		canvas.DrawLine(x, textAreaHeight, x + CodeVisualizer.StackWidth, textAreaHeight,
+			new SKPaint { Color = SKColors.Gray });
 	}
 
 	private void DrawLineGroup(SKCanvas canvas, LineGroup lineGroup, int x, int y)

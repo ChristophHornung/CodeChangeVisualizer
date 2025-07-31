@@ -30,6 +30,7 @@ public class CodeAnalyzer
 		{
 			throw new FileNotFoundException($"The file '{filePath}' does not exist.");
 		}
+
 		string[] lines = await File.ReadAllLinesAsync(filePath);
 		return await this.AnalyzeFileAsync(relativePath, lines);
 	}
