@@ -4,7 +4,7 @@ public class CodeAnalyzer
 {
 	public async Task<List<FileAnalysis>> AnalyzeDirectoryAsync(string directoryPath)
 	{
-		List<FileAnalysis> results = new List<FileAnalysis>();
+		List<FileAnalysis> results = [];
 		string[] csharpFiles = Directory.GetFiles(directoryPath, "*.cs", SearchOption.AllDirectories);
 
 		foreach (string filePath in csharpFiles)
@@ -19,7 +19,7 @@ public class CodeAnalyzer
 
 	public async Task<FileAnalysis> AnalyzeFileAsync(Stream stream, string relativePath)
 	{
-		using StreamReader reader = new StreamReader(stream);
+		using StreamReader reader = new(stream);
 		string[] lines = (await reader.ReadToEndAsync()).Split([Environment.NewLine], StringSplitOptions.None);
 		return await this.AnalyzeFileAsync(relativePath, lines);
 	}
@@ -37,7 +37,7 @@ public class CodeAnalyzer
 
 	private Task<FileAnalysis> AnalyzeFileAsync(string relativePath, string[] lines)
 	{
-		List<LineGroup> lineGroups = new List<LineGroup>();
+		List<LineGroup> lineGroups = [];
 
 		LineType currentType = LineType.Empty;
 		int currentStart = 1;
@@ -56,7 +56,7 @@ public class CodeAnalyzer
 			{
 				if (currentLength > 0)
 				{
-					lineGroups.Add(new LineGroup
+					lineGroups.Add(new LineGroup()
 					{
 						Start = currentStart,
 						Length = currentLength,
@@ -73,7 +73,7 @@ public class CodeAnalyzer
 		// Add the last group
 		if (currentLength > 0)
 		{
-			lineGroups.Add(new LineGroup
+			lineGroups.Add(new()
 			{
 				Start = currentStart,
 				Length = currentLength,
@@ -145,11 +145,11 @@ public class CodeAnalyzer
 	private bool IsComplexityIncreasingLine(string line)
 	{
 		string trimmed = line.Trim();
-		string[] complexityKeywords = new[]
-		{
+		string[] complexityKeywords =
+		[
 			"if", "else", "for", "foreach", "while", "do", "switch", "case", "catch", "finally",
 			"try", "throw", "return", "break", "continue", "goto", "yield", "await", "lock"
-		};
+		];
 
 		// Remove comments for keyword detection
 		string codeOnly = this.RemoveComments(trimmed);

@@ -12,14 +12,14 @@ public class CodeVisualizer
 
 	private static readonly SKFont Font = new() { Size = 10 };
 
-	private static readonly SKColor[] LineTypeColors =
-	[
-		SKColors.White, // Empty
-		SKColors.Green, // Comment
-		SKColors.Red, // ComplexityIncreasing
-		SKColors.Gray, // Code
-		SKColors.LightGreen // CodeAndComment
-	];
+	private static readonly Dictionary<LineType, SKColor> LineTypeColors = new()
+	{
+		[LineType.Empty] = SKColors.White,
+		[LineType.Comment] = SKColors.Green,
+		[LineType.ComplexityIncreasing] = SKColors.Red,
+		[LineType.Code] = SKColors.Gray,
+		[LineType.CodeAndComment] = SKColors.LightGreen
+	};
 
 	public void GenerateVisualization(List<FileAnalysis> analysis, string outputPath)
 	{
@@ -134,7 +134,7 @@ public class CodeVisualizer
 
 	private void DrawLineGroup(SKCanvas canvas, LineGroup lineGroup, int x, int y)
 	{
-		SKColor color = CodeVisualizer.LineTypeColors[(int)lineGroup.Type];
+		SKColor color = CodeVisualizer.LineTypeColors[lineGroup.Type];
 		int height = lineGroup.Length * CodeVisualizer.PixelPerLine;
 		SKRect rect = new SKRect(x, y, x + CodeVisualizer.StackWidth, y + height);
 
