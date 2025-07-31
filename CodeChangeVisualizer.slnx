@@ -1,0 +1,11 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="CodeChangeVisualizer.Viewer/CodeChangeVisualizer.Viewer.csproj" />
+  <Project Path="CodeChangeVisualizer.Analyzer/CodeChangeVisualizer.Analyzer.csproj" />
+  <Project Path="CodeChangeVisualizer.Runner/CodeChangeVisualizer.Runner.csproj" />
+  <Project Path="CodeChangeVisualizer.Tests/CodeChangeVisualizer.Tests.csproj" />
+</Solution>

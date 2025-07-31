@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<ItemGroup>
+		<PackageReference Include="SkiaSharp" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\CodeChangeVisualizer.Analyzer\CodeChangeVisualizer.Analyzer.csproj" />
+	</ItemGroup>
+
+</Project>
