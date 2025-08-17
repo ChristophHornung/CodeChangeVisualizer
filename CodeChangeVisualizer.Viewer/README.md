@@ -36,25 +36,28 @@ The viewer implements a horizontal color stack visualization as specified in the
 
 - **Simple Design**: For large projects, keeps the view very simple
 - **Horizontal Layout**: Files are arranged horizontally as 40-pixel wide stacks
-- **Angled Text**: File names are rotated -45° (left bottom to right top) with precise measurement-based sizing and explicit text area management
+- **Angled Text**: File names are rotated -45° (left bottom to right top) with precise measurement-based sizing and
+  explicit text area management
 - **Color Stack**: Each file shows a vertical stack of colored blocks
 - **Pixel-Per-Line**: Each line range is represented as a block of pixels with height = number of lines
 - **No Legend**: Maximum simplicity for performance with large codebases
 
 The viewer consists of:
+
 - **CodeVisualizer**: Main class responsible for generating PNG images
 - **Program**: Console application entry point for command-line usage
 
 ## Output Format
 
 The generated PNG images include:
+
 - File headers with precisely measured angled text (-45°) using explicit text area and stack area separation
 - Horizontal color stack visualization where:
-  - Files are arranged horizontally as 40-pixel wide stacks
-  - Each line range is represented as a block of pixels
-  - Block height = number of lines in the range
-  - Each line type has its specific color
-  - No legend for maximum simplicity and performance
+    - Files are arranged horizontally as 40-pixel wide stacks
+    - Each line range is represented as a block of pixels
+    - Block height = number of lines in the range
+    - Each line type has its specific color
+    - No legend for maximum simplicity and performance
 
 ## Building
 
@@ -65,5 +68,6 @@ dotnet build CodeChangeVisualizer.slnx
 ## Testing
 
 The viewer is tested through the Runner project:
+
 1. Run the runner with visualization option
 2. Verify the generated PNG file 

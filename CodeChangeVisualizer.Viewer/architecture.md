@@ -3,6 +3,7 @@
 The visualizer is the UI part for the code analyzer. It takes the json output and visualizes it.
 
 # Default visualization
+
 Currently we only have a single default visualization.
 
 Since we work with possibly large projects we keep the view very simple:
@@ -12,7 +13,8 @@ Since we work with possibly large projects we keep the view very simple:
 
 [FileName]
 ----------
-(from here every line range is a block of pixels of the same height, i.e. a line object that is 10 lines long is 10 pixels)
+(from here every line range is a block of pixels of the same height, i.e. a line object that is 10 lines long is 10
+pixels)
 XXXX
 OOOO
 ////
@@ -22,10 +24,12 @@ Every line gets its specific color
 
 3. Each stack is only 40 pixels wide
 4. The stacks are arranged horizontally
-5. File names are angled at -45° (left bottom to right top) with precise measurement-based sizing and explicit text area management
+5. File names are angled at -45° (left bottom to right top) with precise measurement-based sizing and explicit text area
+   management
 6. No legend is displayed for maximum simplicity
 
 ## Color Scheme
+
 - **Red**: Complexity-increasing lines (if, for, while, etc.)
 - **Green**: Comment lines
 - **Light Green**: Lines containing both code and comments

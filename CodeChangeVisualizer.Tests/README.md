@@ -22,9 +22,12 @@ The test suite includes comprehensive unit tests that verify individual line typ
 
 - **Empty**: `""`, `"   "`, `"\t"`, `"\n"`
 - **Comment**: `"// comment"`, `"/// XML doc"`, `"/* block */"`, `"* continuation"`
-- **ComplexityIncreasing**: `"if (condition)"`, `"for (int i = 0; i < 10; i++)"`, `"switch (value)"`, `"try"`, `"catch (Exception ex)"`, `"return value;"`, `"break;"`, `"continue;"`, `"throw new Exception();"`, `"await Task.Delay(1000);"`, `"lock (obj)"`
+- **ComplexityIncreasing**: `"if (condition)"`, `"for (int i = 0; i < 10; i++)"`, `"switch (value)"`, `"try"`,
+  `"catch (Exception ex)"`, `"return value;"`, `"break;"`, `"continue;"`, `"throw new Exception();"`,
+  `"await Task.Delay(1000);"`, `"lock (obj)"`
 - **Code**: `"var x = 5;"`, `"Console.WriteLine(\"Hello\");"`, `"public void Method()"`, `"x++;"`, `"Method();"`
-- **CodeAndComment**: `"var x = 5; // Initialize x"`, `"Console.WriteLine(\"Hello\"); // Print greeting"`, `"x++; // Increment"`
+- **CodeAndComment**: `"var x = 5; // Initialize x"`, `"Console.WriteLine(\"Hello\"); // Print greeting"`,
+  `"x++; // Increment"`
 
 ### Test Results
 

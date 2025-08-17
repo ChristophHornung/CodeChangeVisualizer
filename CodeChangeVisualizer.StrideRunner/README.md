@@ -1,0 +1,70 @@
+# CodeChangeVisualizer.StrideRunner
+
+A 3D visualization tool for code analysis data using Stride Game Engine.
+
+## Overview
+
+This project provides a 3D "skyscraper" visualization of code analysis data, where each file is represented as a tower
+of colored blocks. Each block represents a line group with a specific line type, and the height of each block
+corresponds to the number of lines in that group.
+
+## Features
+
+- **3D Skyscraper Visualization**: Files are displayed as vertical towers along the X-axis
+- **Color-Coded Blocks**: Different line types are represented with distinct colors:
+    - **White**: Empty lines
+    - **Green**: Comment lines
+    - **Red**: Complexity-increasing lines (if, for, while, etc.)
+    - **Gray**: Regular code lines
+    - **Light Green**: Lines containing both code and comments
+- **Interactive 3D View**: Navigate around the visualization using mouse and keyboard
+- **Real-time Rendering**: Powered by Stride Game Engine for smooth 3D graphics
+
+## Usage
+
+1. First, generate analysis data using the Runner project:
+   ```bash
+   dotnet run --project CodeChangeVisualizer.Runner -- --directory ./src --output analysis.json
+   ```
+
+2. Then visualize the data using StrideRunner:
+   ```bash
+   dotnet run --project CodeChangeVisualizer.StrideRunner -- analysis.json
+   ```
+
+## Controls
+
+- **Mouse**: Rotate camera view
+- **WASD**: Move camera
+- **Mouse Wheel**: Zoom in/out
+- **Escape**: Exit the application
+
+## Architecture
+
+The StrideRunner consists of:
+
+- **Program.cs**: Entry point that loads JSON analysis data and starts the Stride game
+- **VisualizeGame.cs**: Stride game class that sets up the 3D scene and camera
+- **SkyscraperVisualizer.cs**: Builds the 3D scene from analysis data
+- **BlockDescriptorComponent.cs**: Component that stores block size and color information
+
+## Dependencies
+
+- **Stride.Engine**: 3D game engine for rendering
+- **CodeChangeVisualizer.Stride**: Contains the visualization logic
+- **System.Text.Json**: For parsing analysis data
+
+## Building
+
+```bash
+dotnet build CodeChangeVisualizer.slnx
+```
+
+## Comparison with Viewer Project
+
+While the Viewer project creates 2D PNG images, the StrideRunner provides an interactive 3D experience:
+
+- **Viewer**: Static 2D horizontal color stacks
+- **StrideRunner**: Interactive 3D vertical towers
+
+Both use the same color scheme and represent the same data, but offer different visualization approaches. 

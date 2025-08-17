@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<ItemGroup>
-	  <ProjectReference Include="..\CodeChangeVisualizer.Analyzer\CodeChangeVisualizer.Analyzer.csproj" />
-	  <ProjectReference Include="..\CodeChangeVisualizer.Viewer\CodeChangeVisualizer.Viewer.csproj" />
+		<ProjectReference Include="..\CodeChangeVisualizer.Analyzer\CodeChangeVisualizer.Analyzer.csproj"/>
+		<ProjectReference Include="..\CodeChangeVisualizer.Viewer\CodeChangeVisualizer.Viewer.csproj"/>
 	</ItemGroup>
 
 	<PropertyGroup>

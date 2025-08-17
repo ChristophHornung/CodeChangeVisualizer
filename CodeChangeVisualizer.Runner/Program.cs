@@ -28,6 +28,7 @@ public class Program
 					{
 						configFile = args[++i];
 					}
+
 					break;
 				case "--directory":
 				case "-d":
@@ -35,6 +36,7 @@ public class Program
 					{
 						config.Directory = args[++i];
 					}
+
 					break;
 				case "--json":
 				case "-j":
@@ -42,6 +44,7 @@ public class Program
 					{
 						config.JsonOutput = args[++i];
 					}
+
 					break;
 				case "--visualization":
 				case "-v":
@@ -49,6 +52,7 @@ public class Program
 					{
 						config.VisualizationOutput = args[++i];
 					}
+
 					break;
 				case "--console":
 				case "-c":
@@ -60,6 +64,7 @@ public class Program
 					{
 						config.IgnorePatterns.Add(args[++i]);
 					}
+
 					break;
 				case "--help":
 				case "-h":
@@ -76,6 +81,7 @@ public class Program
 							config.OutputToConsole = true;
 						}
 					}
+
 					break;
 			}
 		}
@@ -83,7 +89,7 @@ public class Program
 		// Load config file if specified
 		if (configFile != null)
 		{
-			config = await LoadConfigurationFromFile(configFile, config);
+			config = await Program.LoadConfigurationFromFile(configFile, config);
 		}
 
 		if (config.Directory == null)
@@ -110,7 +116,7 @@ public class Program
 		{
 			CodeAnalyzer analyzer = new CodeAnalyzer();
 			List<FileAnalysis> results = await analyzer.AnalyzeDirectoryAsync(
-				config.Directory, 
+				config.Directory,
 				config.IgnorePatterns.Count > 0 ? config.IgnorePatterns : null,
 				config.FileExtensions.Count > 0 ? config.FileExtensions : null);
 
@@ -170,7 +176,7 @@ public class Program
 		}
 
 		// Merge configurations (command line takes precedence)
-		return MergeConfigurations(fileConfig, baseConfig);
+		return Program.MergeConfigurations(fileConfig, baseConfig);
 	}
 
 	private static Configuration MergeConfigurations(Configuration fileConfig, Configuration commandLineConfig)

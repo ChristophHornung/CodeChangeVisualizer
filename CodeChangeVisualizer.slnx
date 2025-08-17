@@ -1,18 +1,19 @@
 <Solution>
-  <Configurations>
-    <Platform Name="Any CPU" />
-    <Platform Name="x64" />
-    <Platform Name="x86" />
-  </Configurations>
-  <Project Path="CodeChangeVisualizer.Viewer/CodeChangeVisualizer.Viewer.csproj" />
-  <Folder Name="/SolutionItems/">
-    <File Path=".editorconfig" />
-    <File Path=".gitignore" />
-    <File Path="Directory.Build.props" />
-    <File Path="Directory.Packages.props" />
-    <File Path="README.md" />
-  </Folder>
-  <Project Path="CodeChangeVisualizer.Analyzer/CodeChangeVisualizer.Analyzer.csproj" />
-  <Project Path="CodeChangeVisualizer.Runner/CodeChangeVisualizer.Runner.csproj" />
-  <Project Path="CodeChangeVisualizer.Tests/CodeChangeVisualizer.Tests.csproj" />
+    <Configurations>
+        <Platform Name="Any CPU"/>
+        <Platform Name="x64"/>
+        <Platform Name="x86"/>
+    </Configurations>
+    <Project Path="CodeChangeVisualizer.Viewer/CodeChangeVisualizer.Viewer.csproj"/>
+    <Folder Name="/SolutionItems/">
+        <File Path=".editorconfig"/>
+        <File Path=".gitignore"/>
+        <File Path="Directory.Build.props"/>
+        <File Path="Directory.Packages.props"/>
+        <File Path="README.md"/>
+    </Folder>
+    <Project Path="CodeChangeVisualizer.Analyzer/CodeChangeVisualizer.Analyzer.csproj"/>
+    <Project Path="CodeChangeVisualizer.Runner/CodeChangeVisualizer.Runner.csproj"/>
+    <Project Path="CodeChangeVisualizer.Tests/CodeChangeVisualizer.Tests.csproj"/>
+    <Project Path="CodeChangeVisualizer.StrideRunner/CodeChangeVisualizer.StrideRunner.csproj"/>
 </Solution>

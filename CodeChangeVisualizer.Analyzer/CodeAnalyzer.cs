@@ -1,14 +1,17 @@
 namespace CodeChangeVisualizer.Analyzer;
 
+using System.Text.RegularExpressions;
+
 public class CodeAnalyzer
 {
-	public async Task<List<FileAnalysis>> AnalyzeDirectoryAsync(string directoryPath, List<string>? ignorePatterns = null, List<string>? fileExtensions = null)
+	public async Task<List<FileAnalysis>> AnalyzeDirectoryAsync(string directoryPath,
+		List<string>? ignorePatterns = null, List<string>? fileExtensions = null)
 	{
 		List<FileAnalysis> results = [];
-		
+
 		// Default to C# files if no extensions specified
 		fileExtensions ??= new List<string> { "*.cs" };
-		
+
 		// Get all files matching the specified extensions
 		List<string> allFiles = new();
 		foreach (string extension in fileExtensions)
@@ -29,6 +32,24 @@ public class CodeAnalyzer
 		return results;
 	}
 
+	public async Task<FileAnalysis> AnalyzeFileAsync(Stream stream, string relativePath)
+	{
+		using StreamReader reader = new(stream);
+		string[] lines = (await reader.ReadToEndAsync()).Split([Environment.NewLine], StringSplitOptions.None);
+		return await this.AnalyzeFileAsync(relativePath, lines);
+	}
+
+	public async Task<FileAnalysis> AnalyzeFileAsync(string filePath, string relativePath)
+	{
+		if (!File.Exists(filePath))
+		{
+			throw new FileNotFoundException($"The file '{filePath}' does not exist.");
+		}
+
+		string[] lines = await File.ReadAllLinesAsync(filePath);
+		return await this.AnalyzeFileAsync(relativePath, lines);
+	}
+
 	private List<string> FilterFiles(List<string> files, string baseDirectory, List<string>? ignorePatterns)
 	{
 		if (ignorePatterns == null || ignorePatterns.Count == 0)
@@ -37,7 +58,7 @@ public class CodeAnalyzer
 		}
 
 		List<string> filteredFiles = new();
-		
+
 		foreach (string filePath in files)
 		{
 			string relativePath = Path.GetRelativePath(baseDirectory, filePath).Replace('\\', '/');
@@ -47,7 +68,7 @@ public class CodeAnalyzer
 			{
 				try
 				{
-					if (System.Text.RegularExpressions.Regex.IsMatch(relativePath, pattern))
+					if (Regex.IsMatch(relativePath, pattern))
 					{
 						shouldInclude = false;
 						break;
@@ -67,24 +88,6 @@ public class CodeAnalyzer
 		}
 
 		return filteredFiles;
-	}
-
-	public async Task<FileAnalysis> AnalyzeFileAsync(Stream stream, string relativePath)
-	{
-		using StreamReader reader = new(stream);
-		string[] lines = (await reader.ReadToEndAsync()).Split([Environment.NewLine], StringSplitOptions.None);
-		return await this.AnalyzeFileAsync(relativePath, lines);
-	}
-
-	public async Task<FileAnalysis> AnalyzeFileAsync(string filePath, string relativePath)
-	{
-		if (!File.Exists(filePath))
-		{
-			throw new FileNotFoundException($"The file '{filePath}' does not exist.");
-		}
-
-		string[] lines = await File.ReadAllLinesAsync(filePath);
-		return await this.AnalyzeFileAsync(relativePath, lines);
 	}
 
 	private Task<FileAnalysis> AnalyzeFileAsync(string relativePath, string[] lines)

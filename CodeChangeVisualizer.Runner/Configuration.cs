@@ -21,4 +21,4 @@ public class Configuration
 
 	[JsonPropertyName("fileExtensions")]
 	public List<string> FileExtensions { get; set; } = new() { "*.cs" };
-} 
+}

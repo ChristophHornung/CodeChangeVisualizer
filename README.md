@@ -1,12 +1,16 @@
 # CodeChangeVisualizer
 
-A comprehensive code analysis and visualization solution with separate projects for analysis, runner, viewer, and testing.
+A comprehensive code analysis and visualization solution with separate projects for analysis, runner, viewer, and
+testing.
 
 ## Project Structure
 
 - **CodeChangeVisualizer.Analyzer**: Core analysis engine that processes C# files and identifies line types
-- **CodeChangeVisualizer.Runner**: Console application that uses the analyzer and viewer to process directories and generate visualizations
+- **CodeChangeVisualizer.Runner**: Console application that uses the analyzer and viewer to process directories and
+  generate visualizations
 - **CodeChangeVisualizer.Viewer**: Class library for generating PNG visualizations using SkiaSharp
+- **CodeChangeVisualizer.Stride**: Class library for generating a 3D tower-like visualization (skyscraper per file)
+  using Stride
 - **CodeChangeVisualizer.Tests**: Unit tests for the analyzer functionality
 
 ## Features
@@ -74,6 +78,7 @@ The solution consists of:
 ## Output Format
 
 The generated PNG images include:
+
 - Color legend at the top
 - File headers with separator lines
 - Line groups with color-coded rectangles
@@ -88,6 +93,7 @@ dotnet build CodeChangeVisualizer.slnx
 ## Testing
 
 The solution can be tested by:
+
 1. Running unit tests: `dotnet test CodeChangeVisualizer.slnx`
 2. Running the runner with different command line options
 3. Verifying JSON output and PNG visualizations 

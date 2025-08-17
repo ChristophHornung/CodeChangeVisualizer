@@ -1,16 +1,17 @@
 # CodeChangeVisualizer.Runner
 
-A console application that analyzes C# files in a directory and outputs a JSON representation of code structure and complexity.
+A console application that analyzes C# files in a directory and outputs a JSON representation of code structure and
+complexity.
 
 ## Features
 
 - **File Analysis**: Scans all `.cs` files in a directory and subdirectories
 - **Line Type Classification**: Categorizes each line into one of five types:
-  - `Comment`: Single-line or block comments
-  - `ComplexityIncreasing`: Code that increases cyclomatic complexity (if, for, while, switch, etc.)
-  - `Code`: Regular code that doesn't increase complexity
-  - `CodeAndComment`: Lines containing both code and comments
-  - `Empty`: Empty or whitespace-only lines
+    - `Comment`: Single-line or block comments
+    - `ComplexityIncreasing`: Code that increases cyclomatic complexity (if, for, while, switch, etc.)
+    - `Code`: Regular code that doesn't increase complexity
+    - `CodeAndComment`: Lines containing both code and comments
+    - `Empty`: Empty or whitespace-only lines
 - **Line Grouping**: Groups consecutive lines of the same type into ranges
 - **JSON Output**: Produces structured JSON output for easy processing
 
@@ -77,6 +78,7 @@ The program outputs a JSON array where each element represents a file:
 ## Complexity Detection
 
 The analyzer identifies the following complexity-increasing constructs:
+
 - Control flow statements: `if`, `else`, `for`, `foreach`, `while`, `do`
 - Switch statements: `switch`, `case`
 - Exception handling: `try`, `catch`, `finally`, `throw`
