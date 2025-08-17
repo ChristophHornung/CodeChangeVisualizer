@@ -5,6 +5,10 @@ using Stride.CommunityToolkit.Rendering.ProceduralModels;
 using Stride.Core.Mathematics;
 using Stride.Engine;
 using Stride.CommunityToolkit.Engine;
+using Stride.Rendering.Materials;
+using Stride.Rendering;
+using Stride.Rendering.Materials.ComputeColors;
+using Stride.Rendering.Lights;
 
 /// <summary>
 /// Builds a Stride Scene representing the analysis as a set of "skyscraper" towers.
@@ -62,7 +66,7 @@ public class SkyscraperVisualizer
 	/// </summary>
 	private Entity CreateTowerRoot(FileAnalysis file, float towerX)
 	{
-		var fileRoot = new Entity(file.File);
+		Entity fileRoot = new Entity(file.File);
 		fileRoot.Transform.Position = new Vector3(towerX, 0f, 0f);
 		return fileRoot;
 	}
@@ -77,7 +81,7 @@ public class SkyscraperVisualizer
 
         foreach (LineGroup group in file.Lines)
         {
-            float height = MathF.Max(group.Length * SkyscraperVisualizer.UnitsPerLine, 0.5f);
+            float height = group.Length * SkyscraperVisualizer.UnitsPerLine;
             Entity block = this.CreateBlock(file, group, currentY, game);
             fileRoot.AddChild(block);
             currentY += height; // Move up for the next block
@@ -91,11 +95,11 @@ public class SkyscraperVisualizer
     /// </summary>
     private Entity CreateBlock(FileAnalysis file, LineGroup group, float currentY, Game game)
     {
-        float height = MathF.Max(group.Length * SkyscraperVisualizer.UnitsPerLine, 0.5f);
+	    float height = group.Length * SkyscraperVisualizer.UnitsPerLine;w
         Color4 color = SkyscraperVisualizer.LineTypeColors[group.Type];
 
         // Create a cube using Community Toolkit primitives with size options
-        var createOptions = new Primitive3DCreationOptions
+        Primitive3DCreationOptions createOptions = new Primitive3DCreationOptions
         {
             Size = new Vector3(SkyscraperVisualizer.BlockWidth, height, SkyscraperVisualizer.BlockDepth)
         };
@@ -104,11 +108,57 @@ public class SkyscraperVisualizer
         cube.Name = $"{file.File} [{group.Start}-{group.Start + group.Length - 1}] {group.Type}";
         cube.Transform.Position = new Vector3(0f, currentY + height / 2, 0f);
 
-        // Note: Color is calculated but not applied yet due to material complexity
-        // TODO: Apply color to material in future iteration
+        // Apply material color directly so it renders with the intended color
+        this.ApplyColorToCube(game, cube, color);
+
+        // Attach color metadata component so renderers can use it
+        cube.Add(new BlockDescriptorComponent { Size = new Vector3(SkyscraperVisualizer.BlockWidth, height, SkyscraperVisualizer.BlockDepth), Color = color });
 
         Console.WriteLine($"  Added block: {cube.Name} at Y={currentY + height / 2}, height={height}, color={color}");
 
         return cube;
+    }
+
+    /// <summary>
+    /// Applies a solid color material to the given cube entity.
+    /// </summary>
+    private void ApplyColorToCube(Game game, Entity cube, Color4 color)
+    {
+        ModelComponent? modelComponent = cube.Get<ModelComponent>();
+        if (modelComponent == null)
+        {
+            return; // Nothing to color
+        }
+
+        // Note on lighting and perceived black colors:
+        // Stride uses a PBR (physically based) lighting model. A Diffuse/Albedo color does not emit light by itself;
+        // it only reflects incoming light. If the scene lacks sufficient light (e.g., no/weak lights, grazing angles,
+        // low exposure/tonemapping), purely diffuse objects can look very dark or even black. Adding an Emissive
+        // feature makes the material self-lit so the intended color is visible regardless of lighting conditions.
+        // For production, prefer fixing lighting (directional/ambient intensity and orientation) and exposure,
+        // then reduce/remove Emissive once the scene is properly lit.
+        MaterialDescriptor materialDesc = new()
+        {
+            Attributes = new MaterialAttributes
+            {
+                Diffuse = new MaterialDiffuseMapFeature(new ComputeColor(color)),
+	            DiffuseModel = new MaterialDiffuseLambertModelFeature(),
+                // Emissive = new MaterialEmissiveMapFeature(new ComputeColor(color))
+            }
+        };
+
+        Material? material = Material.New(game.GraphicsDevice, materialDesc);
+
+        if (modelComponent.Model != null)
+        {
+            if (modelComponent.Model.Materials.Count > 0)
+            {
+                modelComponent.Model.Materials[0] = material;
+            }
+            else
+            {
+                modelComponent.Model.Materials.Add(material);
+            }
+        }
     }
 }

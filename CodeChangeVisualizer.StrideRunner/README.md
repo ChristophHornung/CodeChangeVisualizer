@@ -68,3 +68,17 @@ While the Viewer project creates 2D PNG images, the StrideRunner provides an int
 - **StrideRunner**: Interactive 3D vertical towers
 
 Both use the same color scheme and represent the same data, but offer different visualization approaches. 
+
+## Why Diffuse looked black (and why Emissive fixed it)
+
+- Stride uses a PBR material model. A Diffuse/Albedo color only reflects light; it doesn't emit any.
+- With no/insufficient lights, grazing light directions, dark environment lighting, or low exposure/tonemapping, albedo surfaces can render very dark or black.
+- Adding an Emissive feature makes the material self-lit, so it shows the intended color regardless of lighting. This is ideal for debugging or flat-color visualization, but not physically accurate if strong emissive is left enabled everywhere.
+
+How to make Diffuse work without Emissive:
+- Add/adjust lighting: e.g., a directional light pointing at the towers; optionally add skybox/environment lighting; increase light intensity.
+- Adjust exposure/tonemapping so the scene isn’t underexposed.
+- Ensure camera framing and face orientation are correct (avoid backface culling hiding faces).
+- Alternatively, use an Unlit material for pure color rendering when physical lighting isn’t desired.
+
+In this runner we enable Emissive on block materials to guarantee visibility out-of-the-box. You can tune lights later and reduce/remove Emissive for physically-plausible shading.
