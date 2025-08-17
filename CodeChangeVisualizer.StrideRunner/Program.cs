@@ -1,5 +1,7 @@
 ﻿namespace CodeChangeVisualizer.StrideRunner;
 
+using System.Text.Json;
+using CodeChangeVisualizer.Analyzer;
 using Stride.CommunityToolkit.Bepu;
 using Stride.CommunityToolkit.Engine;
 using Stride.CommunityToolkit.Skyboxes;
@@ -9,6 +11,52 @@ internal class Program
 {
 	private static void Main()
 	{
+		// Expect a JSON file path (produced by the analyzer) as the first CLI argument.
+		// If none is given, attempt to use a default analysis.json located under the solution (.slnx) directory's bin folder.
+		string[] args = Environment.GetCommandLineArgs();
+		string? jsonPath = null;
+		if (args.Length > 1)
+		{
+			jsonPath = args[1];
+		}
+		else
+		{
+			jsonPath = GetDefaultAnalysisJsonPath();
+			if (jsonPath != null)
+			{
+				Console.WriteLine($"No parameter provided. Using default analysis JSON: {jsonPath}");
+			}
+		}
+
+		if (string.IsNullOrWhiteSpace(jsonPath) || !File.Exists(jsonPath))
+		{
+			Console.WriteLine("Usage: CodeChangeVisualizer.StrideRunner <analysis.json>");
+			Console.WriteLine("No valid analysis JSON found. Looked for a default at <solution>\\bin\\analysis.json (and common debug paths).");
+			return;
+		}
+
+		Console.WriteLine($"Loading analysis JSON: {jsonPath}");
+		List<FileAnalysis>? analysis;
+		try
+		{
+			string json = File.ReadAllText(jsonPath);
+			analysis = JsonSerializer.Deserialize<List<FileAnalysis>>(json, new JsonSerializerOptions
+			{
+				PropertyNameCaseInsensitive = true
+			});
+
+			if (analysis == null)
+			{
+				Console.WriteLine("Error: Failed to parse analysis JSON.");
+				return;
+			}
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Failed to load analysis JSON: {ex.Message}");
+			return;
+		}
+
 		using var game = new Game();
 
 		game.Run(start: (Scene rootScene) =>
@@ -22,39 +70,54 @@ internal class Program
 			// Create the skyscraper visualizer
 			var visualizer = new SkyscraperVisualizer();
 
-			// Create sample data for testing
-			List<FileAnalysis> sampleData = Program.CreateSampleData();
-
-			// Build the visualization
-			visualizer.BuildScene(rootScene, sampleData, game);
+			// Build the visualization using the provided JSON analysis data
+			visualizer.BuildScene(rootScene, analysis, game);
 
 			Console.WriteLine("Skyscraper visualization setup complete!");
 		});
 	}
 
-	private static List<FileAnalysis> CreateSampleData()
+	private static string? GetDefaultAnalysisJsonPath()
 	{
-		return new List<FileAnalysis>
+		string? solutionRoot = FindSolutionRoot();
+		if (string.IsNullOrEmpty(solutionRoot))
+			return null;
+
+		string[] candidates = new[]
 		{
-			new FileAnalysis
-			{
-				File = "Sample1.cs",
-				Lines = new List<LineGroup>
-				{
-					new LineGroup { Type = LineType.Code, Start = 1, Length = 10 },
-					new LineGroup { Type = LineType.Comment, Start = 15, Length = 11 },
-					new LineGroup { Type = LineType.ComplexityIncreasing, Start = 30, Length = 6 }
-				}
-			},
-			new FileAnalysis
-			{
-				File = "Sample2.cs",
-				Lines = new List<LineGroup>
-				{
-					new LineGroup { Type = LineType.Code, Start = 1, Length = 20 },
-					new LineGroup { Type = LineType.Comment, Start = 25, Length = 16 }
-				}
-			}
+			Path.Combine(solutionRoot, "bin", "analysis.json"),
+			Path.Combine(solutionRoot, "bin", "Debug", "net9.0", "analysis.json"),
+			Path.Combine(solutionRoot, "bin", "Debug", "analysis.json")
 		};
+
+		foreach (var candidate in candidates)
+		{
+			if (File.Exists(candidate))
+				return candidate;
+		}
+
+		return null;
+	}
+
+	private static string? FindSolutionRoot()
+	{
+		try
+		{
+			string? dir = AppContext.BaseDirectory;
+			DirectoryInfo? current = new DirectoryInfo(dir);
+			while (current != null)
+			{
+				string slnx = Path.Combine(current.FullName, "CodeChangeVisualizer.slnx");
+				if (File.Exists(slnx))
+					return current.FullName;
+
+				current = current.Parent;
+			}
+		}
+		catch
+		{
+			// ignore
+		}
+		return null;
 	}
 }

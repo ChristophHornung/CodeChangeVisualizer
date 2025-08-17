@@ -1,5 +1,6 @@
 namespace CodeChangeVisualizer.StrideRunner;
 
+using CodeChangeVisualizer.Analyzer;
 using Stride.CommunityToolkit.Bepu;
 using Stride.CommunityToolkit.Rendering.ProceduralModels;
 using Stride.Core.Mathematics;
@@ -95,7 +96,7 @@ public class SkyscraperVisualizer
     /// </summary>
     private Entity CreateBlock(FileAnalysis file, LineGroup group, float currentY, Game game)
     {
-	    float height = group.Length * SkyscraperVisualizer.UnitsPerLine;w
+    	float height = group.Length * SkyscraperVisualizer.UnitsPerLine;
         Color4 color = SkyscraperVisualizer.LineTypeColors[group.Type];
 
         // Create a cube using Community Toolkit primitives with size options
