@@ -82,11 +82,15 @@ public class HoverTooltipScript : SyncScript
             var towerRoot = closestBlock.GetParent();
             string fileName = towerRoot?.Name ?? closestBlock.Name;
 
-            // Position the tooltip near the mouse cursor in screen space
+            // Compute the world hit position and project to screen space (normalized 0..1, top-left origin)
+            var hitPoint = rayOrigin + rayDir * closestT;
+            Vector3 screenNorm = _camera.WorldToScreenPoint(hitPoint);
+
+            // Convert to pixel coordinates without Y inversion (DebugText expects top-left origin)
             var backBuffer = GraphicsDevice.Presenter?.BackBuffer;
             int width = backBuffer?.Width ?? 0;
             int height = backBuffer?.Height ?? 0;
-            var screenPos = new Int2((int)(mouse.X * width) + 16, (int)((1 - mouse.Y) * height) + 16); // Y is inverted
+            var screenPos = new Int2((int)(screenNorm.X * width) + 16, (int)(screenNorm.Y * height) + 16);
 
             // Print for this frame (call every frame while hovering)
             (this.Game as Stride.Engine.Game)?.DebugTextSystem?.Print(fileName, screenPos, Color4.White);
