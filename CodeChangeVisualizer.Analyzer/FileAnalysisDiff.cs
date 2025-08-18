@@ -1,19 +1,6 @@
 ﻿namespace CodeChangeVisualizer.Analyzer;
 
 /// <summary>
-/// The kind of change described by <see cref="FileAnalysisDiff"/>.
-/// </summary>
-public enum FileAnalysisChangeKind
-{
-    /// <summary>The file content was modified with block edits.</summary>
-    Modify,
-    /// <summary>The file was added.</summary>
-    FileAdd,
-    /// <summary>The file was deleted.</summary>
-    FileDelete
-}
-
-/// <summary>
 /// Unified diff model for a single file analysis. Supports block-level edits (Modify),
 /// whole-file addition (FileAdd), and whole-file deletion (FileDelete).
 /// </summary>

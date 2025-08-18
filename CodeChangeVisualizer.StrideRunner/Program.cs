@@ -14,7 +14,7 @@ internal class Program
 		// Expect a JSON file path (produced by the analyzer) as the first CLI argument.
 		// If none is given, attempt to use a default analysis.json located under the solution (.slnx) directory's bin folder.
 		string[] args = Environment.GetCommandLineArgs();
-		string? jsonPath = null;
+		string? jsonPath;
 		if (args.Length > 1)
 		{
 			jsonPath = args[1];

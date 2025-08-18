@@ -129,10 +129,7 @@ public class Program
 					WriteIndented = true,
 					PropertyNamingPolicy = JsonNamingPolicy.CamelCase
 				});
-				if (config.OutputToConsole)
-				{
-					Console.WriteLine(json);
-				}
+				// Suppress console output in advanced git mode to avoid extremely large logs.
 				if (!string.IsNullOrEmpty(config.JsonOutput))
 				{
 					await File.WriteAllTextAsync(config.JsonOutput!, json);
