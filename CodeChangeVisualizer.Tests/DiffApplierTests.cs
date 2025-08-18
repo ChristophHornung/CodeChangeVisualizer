@@ -19,7 +19,7 @@ public class DiffApplierTests
 
 		// Also validate Start fields are contiguous starting at 0
 		int start = 0;
-		foreach (var g in actual.Lines)
+		foreach (LineGroup g in actual.Lines)
 		{
 			Assert.Equal(start, g.Start);
 			start += g.Length;
@@ -29,7 +29,7 @@ public class DiffApplierTests
 	[Fact]
 	public void Apply_KnownEdits_WithMultipleAdjacentInsertsAndRemoves()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup>
@@ -41,7 +41,7 @@ public class DiffApplierTests
 		};
 
 		// We want new: [Insert Empty(1)] , Code(3) resized->4 , [Remove Comment(2)] , Code(5), Insert Comment(1)
-		var edits = new List<DiffEdit>
+		List<DiffEdit> edits = new List<DiffEdit>
 		{
 			new DiffEdit { Kind = DiffOpType.Insert, Index = 0, LineType = LineType.Empty, NewLength = 1 },
 			new DiffEdit
@@ -50,9 +50,9 @@ public class DiffApplierTests
 			new DiffEdit { Kind = DiffOpType.Insert, Index = 3, LineType = LineType.Comment, NewLength = 1 },
 		};
 
-		var patched = DiffApplier.Apply(oldFa, edits);
+		FileAnalysis patched = DiffApplier.Apply(oldFa, edits);
 
-		var expected = new FileAnalysis
+		FileAnalysis expected = new FileAnalysis
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup>
@@ -70,7 +70,7 @@ public class DiffApplierTests
 	[Fact]
 	public void Roundtrip_ComplexMixed()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup>
@@ -80,7 +80,7 @@ public class DiffApplierTests
 				DiffApplierTests.LG(LineType.CodeAndComment, 4)
 			}
 		};
-		var newFa = new FileAnalysis
+		FileAnalysis newFa = new FileAnalysis
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup>
@@ -91,8 +91,8 @@ public class DiffApplierTests
 			}
 		};
 
-		var edits = Differ.Diff(oldFa, newFa);
-		var patched = DiffApplier.Apply(oldFa, edits);
+		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
+		FileAnalysis patched = DiffApplier.Apply(oldFa, edits);
 
 		DiffApplierTests.AssertSameSequence(newFa, patched);
 	}
@@ -100,7 +100,7 @@ public class DiffApplierTests
 	[Fact]
 	public void Roundtrip_DeletedFile_ToEmpty()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 		{
 			File = "a.cs", Lines = new List<LineGroup>
 			{
@@ -108,10 +108,10 @@ public class DiffApplierTests
 				new LineGroup { Type = LineType.Comment, Length = 2 },
 			}
 		};
-		var newFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
+		FileAnalysis newFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
 
-		var edits = Differ.Diff(oldFa, newFa);
-		var patched = DiffApplier.Apply(oldFa, edits);
+		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
+		FileAnalysis patched = DiffApplier.Apply(oldFa, edits);
 
 		Assert.Equal(2, edits.Count);
 		Assert.All(edits, e => Assert.Equal(DiffOpType.Remove, e.Kind));
@@ -121,17 +121,17 @@ public class DiffApplierTests
 	[Fact]
 	public void Roundtrip_Insert()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.LG(LineType.Code, 10) } };
-		var newFa = new FileAnalysis
+		FileAnalysis newFa = new FileAnalysis
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup>
 				{ DiffApplierTests.LG(LineType.Code, 10), DiffApplierTests.LG(LineType.Comment, 3) }
 		};
 
-		var edits = Differ.Diff(oldFa, newFa);
-		var patched = DiffApplier.Apply(oldFa, edits);
+		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
+		FileAnalysis patched = DiffApplier.Apply(oldFa, edits);
 
 		DiffApplierTests.AssertSameSequence(newFa, patched);
 	}
@@ -139,8 +139,8 @@ public class DiffApplierTests
 	[Fact]
 	public void Roundtrip_NewFile_FromEmpty()
 	{
-		var oldFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
-		var newFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
+		FileAnalysis newFa = new FileAnalysis
 		{
 			File = "a.cs", Lines = new List<LineGroup>
 			{
@@ -149,8 +149,8 @@ public class DiffApplierTests
 			}
 		};
 
-		var edits = Differ.Diff(oldFa, newFa);
-		var patched = DiffApplier.Apply(oldFa, edits);
+		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
+		FileAnalysis patched = DiffApplier.Apply(oldFa, edits);
 
 		Assert.Equal(2, edits.Count);
 		Assert.All(edits, e => Assert.Equal(DiffOpType.Insert, e.Kind));
@@ -166,21 +166,21 @@ public class DiffApplierTests
 	[Fact]
 	public void Roundtrip_NoChanges()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup>
 				{ DiffApplierTests.LG(LineType.Code, 10), DiffApplierTests.LG(LineType.Comment, 3) }
 		};
-		var newFa = new FileAnalysis
+		FileAnalysis newFa = new FileAnalysis
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup>
 				{ DiffApplierTests.LG(LineType.Code, 10), DiffApplierTests.LG(LineType.Comment, 3) }
 		};
 
-		var edits = Differ.Diff(oldFa, newFa);
-		var patched = DiffApplier.Apply(oldFa, edits);
+		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
+		FileAnalysis patched = DiffApplier.Apply(oldFa, edits);
 
 		DiffApplierTests.AssertSameSequence(newFa, patched);
 	}
@@ -188,17 +188,17 @@ public class DiffApplierTests
 	[Fact]
 	public void Roundtrip_Remove()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup>
 				{ DiffApplierTests.LG(LineType.Code, 10), DiffApplierTests.LG(LineType.Comment, 3) }
 		};
-		var newFa = new FileAnalysis
+		FileAnalysis newFa = new FileAnalysis
 			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.LG(LineType.Code, 10) } };
 
-		var edits = Differ.Diff(oldFa, newFa);
-		var patched = DiffApplier.Apply(oldFa, edits);
+		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
+		FileAnalysis patched = DiffApplier.Apply(oldFa, edits);
 
 		DiffApplierTests.AssertSameSequence(newFa, patched);
 	}
@@ -206,13 +206,13 @@ public class DiffApplierTests
 	[Fact]
 	public void Roundtrip_ResizeOnly()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.LG(LineType.Code, 10) } };
-		var newFa = new FileAnalysis
+		FileAnalysis newFa = new FileAnalysis
 			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.LG(LineType.Code, 12) } };
 
-		var edits = Differ.Diff(oldFa, newFa);
-		var patched = DiffApplier.Apply(oldFa, edits);
+		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
+		FileAnalysis patched = DiffApplier.Apply(oldFa, edits);
 
 		DiffApplierTests.AssertSameSequence(newFa, patched);
 	}
@@ -220,13 +220,13 @@ public class DiffApplierTests
 	[Fact]
 	public void Roundtrip_TypeChange_AsRemoveInsert()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.LG(LineType.Code, 10) } };
-		var newFa = new FileAnalysis
+		FileAnalysis newFa = new FileAnalysis
 			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.LG(LineType.Comment, 10) } };
 
-		var edits = Differ.Diff(oldFa, newFa);
-		var patched = DiffApplier.Apply(oldFa, edits);
+		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
+		FileAnalysis patched = DiffApplier.Apply(oldFa, edits);
 
 		DiffApplierTests.AssertSameSequence(newFa, patched);
 	}

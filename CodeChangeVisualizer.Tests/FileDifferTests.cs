@@ -10,7 +10,7 @@ public class FileDifferTests
 	[Fact]
 	public void DeletedFile_ShouldReturnFileDelete()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 		{
 			File = "a.cs", Lines = new List<LineGroup>
 			{
@@ -18,9 +18,9 @@ public class FileDifferTests
 				new LineGroup { Type = LineType.Comment, Length = 2 }
 			}
 		};
-		var newFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
+		FileAnalysis newFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
 
-		var fileDiff = FileDiffer.DiffFile(oldFa, newFa);
+		FileDiff fileDiff = FileDiffer.DiffFile(oldFa, newFa);
 		Assert.Equal(FileChangeKind.FileDelete, fileDiff.Kind);
 		Assert.Null(fileDiff.NewFileLines);
 		Assert.Null(fileDiff.Edits);
@@ -29,15 +29,15 @@ public class FileDifferTests
 	[Fact]
 	public void Modify_ShouldReturnModifyWithEdits()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 			{ File = "a.cs", Lines = new List<LineGroup> { FileDifferTests.LG(LineType.Code, 3) } };
-		var newFa = new FileAnalysis
+		FileAnalysis newFa = new FileAnalysis
 			{ File = "a.cs", Lines = new List<LineGroup> { FileDifferTests.LG(LineType.Code, 5) } };
 
-		var fileDiff = FileDiffer.DiffFile(oldFa, newFa);
+		FileDiff fileDiff = FileDiffer.DiffFile(oldFa, newFa);
 		Assert.Equal(FileChangeKind.Modify, fileDiff.Kind);
 		Assert.NotNull(fileDiff.Edits);
-		var e = Assert.Single(fileDiff.Edits!);
+		DiffEdit e = Assert.Single(fileDiff.Edits!);
 		Assert.Equal(DiffOpType.Resize, e.Kind);
 		Assert.Equal(3, e.OldLength);
 		Assert.Equal(5, e.NewLength);
@@ -46,8 +46,8 @@ public class FileDifferTests
 	[Fact]
 	public void NewFile_ShouldReturnFileAdd()
 	{
-		var oldFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
-		var newFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
+		FileAnalysis newFa = new FileAnalysis
 		{
 			File = "a.cs", Lines = new List<LineGroup>
 			{
@@ -56,7 +56,7 @@ public class FileDifferTests
 			}
 		};
 
-		var fileDiff = FileDiffer.DiffFile(oldFa, newFa);
+		FileDiff fileDiff = FileDiffer.DiffFile(oldFa, newFa);
 		Assert.Equal(FileChangeKind.FileAdd, fileDiff.Kind);
 		Assert.NotNull(fileDiff.NewFileLines);
 		Assert.Equal(2, fileDiff.NewFileLines!.Count);

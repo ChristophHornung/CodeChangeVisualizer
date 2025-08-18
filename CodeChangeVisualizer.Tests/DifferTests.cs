@@ -10,7 +10,7 @@ public class DifferTests
 	[Fact]
 	public void Complex_MixedOperations_AreDetectedInOrder()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup>
@@ -20,7 +20,7 @@ public class DifferTests
 				DifferTests.LG(LineType.CodeAndComment, 4)
 			}
 		};
-		var newFa = new FileAnalysis
+		FileAnalysis newFa = new FileAnalysis
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup>
@@ -31,7 +31,7 @@ public class DifferTests
 			}
 		};
 
-		var edits = Differ.Diff(oldFa, newFa);
+		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
 
 		// Expect: Resize(Code idx0), Remove(Comment old idx1), (CodeAndComment same no op), Insert(Empty idx2)
 		Assert.Equal(3, edits.Count);
@@ -55,7 +55,7 @@ public class DifferTests
 	[Fact]
 	public void DeletedFile_ShouldProduceAllRemoves()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 		{
 			File = "a.cs", Lines = new List<LineGroup>
 			{
@@ -63,9 +63,9 @@ public class DifferTests
 				new LineGroup { Type = LineType.Comment, Length = 2 }
 			}
 		};
-		var newFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
+		FileAnalysis newFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
 
-		var edits = Differ.Diff(oldFa, newFa);
+		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
 		Assert.Equal(2, edits.Count);
 		Assert.All(edits, e => Assert.Equal(DiffOpType.Remove, e.Kind));
 		// Order: removes from old indices 0 then 1 (greedy), or possibly 0 then 1
@@ -80,16 +80,16 @@ public class DifferTests
 	[Fact]
 	public void Insert_NewBlock_ShouldReportInsertWithIndex()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 10) } };
-		var newFa = new FileAnalysis
+		FileAnalysis newFa = new FileAnalysis
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 10), DifferTests.LG(LineType.Comment, 3) }
 		};
 
-		var edits = Differ.Diff(oldFa, newFa);
-		var e = Assert.Single(edits);
+		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
+		DiffEdit e = Assert.Single(edits);
 		Assert.Equal(DiffOpType.Insert, e.Kind);
 		Assert.Equal(1, e.Index); // inserted at position 1 in new
 		Assert.Equal(LineType.Comment, e.LineType);
@@ -101,8 +101,8 @@ public class DifferTests
 	[Fact]
 	public void NewFile_ShouldProduceAllInserts()
 	{
-		var oldFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
-		var newFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
+		FileAnalysis newFa = new FileAnalysis
 		{
 			File = "a.cs", Lines = new List<LineGroup>
 			{
@@ -111,7 +111,7 @@ public class DifferTests
 			}
 		};
 
-		var edits = Differ.Diff(oldFa, newFa);
+		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
 		Assert.Equal(2, edits.Count);
 		Assert.All(edits, e => Assert.Equal(DiffOpType.Insert, e.Kind));
 		Assert.Equal(0, edits[0].Index);
@@ -125,34 +125,34 @@ public class DifferTests
 	[Fact]
 	public void NoChanges_ShouldProduceNoEdits()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 10), DifferTests.LG(LineType.Comment, 3) }
 		};
-		var newFa = new FileAnalysis
+		FileAnalysis newFa = new FileAnalysis
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 10), DifferTests.LG(LineType.Comment, 3) }
 		};
 
-		var edits = Differ.Diff(oldFa, newFa);
+		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
 		Assert.Empty(edits);
 	}
 
 	[Fact]
 	public void Remove_Block_ShouldReportRemoveWithOldIndex()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 10), DifferTests.LG(LineType.Comment, 3) }
 		};
-		var newFa = new FileAnalysis
+		FileAnalysis newFa = new FileAnalysis
 			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 10) } };
 
-		var edits = Differ.Diff(oldFa, newFa);
-		var e = Assert.Single(edits);
+		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
+		DiffEdit e = Assert.Single(edits);
 		Assert.Equal(DiffOpType.Remove, e.Kind);
 		Assert.Equal(1, e.Index); // removed from old at index 1
 		Assert.Equal(LineType.Comment, e.LineType);
@@ -164,13 +164,13 @@ public class DifferTests
 	[Fact]
 	public void Resize_SingleBlock_ShouldReportResize()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 10) } };
-		var newFa = new FileAnalysis
+		FileAnalysis newFa = new FileAnalysis
 			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 12) } };
 
-		var edits = Differ.Diff(oldFa, newFa);
-		var e = Assert.Single(edits);
+		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
+		DiffEdit e = Assert.Single(edits);
 		Assert.Equal(DiffOpType.Resize, e.Kind);
 		Assert.Equal(0, e.Index); // index in new
 		Assert.Equal(LineType.Code, e.LineType);
@@ -182,12 +182,12 @@ public class DifferTests
 	[Fact]
 	public void TypeChange_ShouldBeRemoveThenInsert()
 	{
-		var oldFa = new FileAnalysis
+		FileAnalysis oldFa = new FileAnalysis
 			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 10) } };
-		var newFa = new FileAnalysis
+		FileAnalysis newFa = new FileAnalysis
 			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.LG(LineType.Comment, 10) } };
 
-		var edits = Differ.Diff(oldFa, newFa);
+		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
 		Assert.Equal(2, edits.Count);
 		Assert.Equal(DiffOpType.Remove, edits[0].Kind);
 		Assert.Equal(LineType.Code, edits[0].LineType);

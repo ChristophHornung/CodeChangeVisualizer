@@ -51,7 +51,7 @@ public static class FileDiffer
 		}
 
 		// Otherwise, standard modify with block edits
-		var edits = Differ.Diff(oldFile, newFile);
+		List<DiffEdit> edits = Differ.Diff(oldFile, newFile);
 		return new FileDiff
 		{
 			Kind = FileChangeKind.Modify,

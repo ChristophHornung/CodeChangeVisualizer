@@ -79,7 +79,7 @@ internal class Program
 			return;
 		}
 
-		using var game = new Game();
+		using Game game = new Game();
 
 		game.Run(start: (Scene rootScene) =>
 		{
@@ -90,7 +90,7 @@ internal class Program
 			game.AddSkybox();
 
 			// Create the skyscraper visualizer
-			var visualizer = new SkyscraperVisualizer();
+			SkyscraperVisualizer visualizer = new SkyscraperVisualizer();
 
 			// Build the visualization using the provided JSON analysis data
 			visualizer.BuildScene(rootScene, analysis, game);
@@ -98,7 +98,7 @@ internal class Program
 			Console.WriteLine("Skyscraper visualization setup complete!");
 
 			// Add hover tooltip script
-			var hoverEntity = new Entity("HoverTooltip");
+			Entity hoverEntity = new Entity("HoverTooltip");
 			hoverEntity.Add(new HoverTooltipScript());
 			rootScene.Entities.Add(hoverEntity);
 		});
@@ -119,7 +119,7 @@ internal class Program
 			Path.Combine(solutionRoot, "bin", "Debug", "analysis.json")
 		};
 
-		foreach (var candidate in candidates)
+		foreach (string candidate in candidates)
 		{
 			if (File.Exists(candidate))
 			{

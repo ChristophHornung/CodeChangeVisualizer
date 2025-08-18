@@ -4,6 +4,7 @@ using Stride.CommunityToolkit.Engine;
 using Stride.CommunityToolkit.Scripts;
 using Stride.Core.Mathematics;
 using Stride.Engine;
+using Stride.Graphics;
 
 /// <summary>
 /// Displays the file name of a skyscraper (tower) when the mouse cursor hovers over any of its blocks.
@@ -73,7 +74,7 @@ public class HoverTooltipScript : SyncScript
 			.FirstOrDefault(c => c != null);
 
 		// Cache all blocks (entities that have BlockDescriptorComponent)
-		foreach (var entity in this.SceneSystem.SceneInstance?.RootScene.Entities ?? Enumerable.Empty<Entity>())
+		foreach (Entity entity in this.SceneSystem.SceneInstance?.RootScene.Entities ?? Enumerable.Empty<Entity>())
 		{
 			this.CollectBlocksRecursive(entity);
 		}
@@ -94,7 +95,7 @@ public class HoverTooltipScript : SyncScript
 
 		// Build a ray from the current mouse position
 		// MousePosition is normalized (0..1). Use toolkit extension to get world ray segment
-		var mouse = this.Input.MousePosition;
+		Vector2 mouse = this.Input.MousePosition;
 		// Early out if mouse is not over window
 		if (mouse.X < 0 || mouse.X > 1 || mouse.Y < 0 || mouse.Y > 1)
 		{
@@ -103,27 +104,27 @@ public class HoverTooltipScript : SyncScript
 
 		// Near/Far clip in world units
 		// Use CommunityToolkit's helper to get a world-space ray segment from screen coordinates
-		var mousePos = mouse; // create variable so it can be passed by ref if required by API
+		Vector2 mousePos = mouse; // create variable so it can be passed by ref if required by API
 		RaySegment segment;
 		this._camera.ScreenToWorldRaySegment(ref mousePos, out segment);
-		var rayOrigin = segment.Start;
-		var rayDir = Vector3.Normalize(segment.End - segment.Start);
+		Vector3 rayOrigin = segment.Start;
+		Vector3 rayDir = Vector3.Normalize(segment.End - segment.Start);
 
 		// Find closest intersected block
 		Entity? closestBlock = null;
 		float closestT = float.MaxValue;
-		foreach (var block in this._blocks)
+		foreach (Entity block in this._blocks)
 		{
-			var desc = block.Get<BlockDescriptorComponent>();
+			BlockDescriptorComponent? desc = block.Get<BlockDescriptorComponent>();
 			if (desc == null)
 			{
 				continue;
 			}
 
-			var pos = block.Transform.WorldMatrix.TranslationVector;
-			var half = desc.Size * 0.5f;
-			var min = pos - half;
-			var max = pos + half;
+			Vector3 pos = block.Transform.WorldMatrix.TranslationVector;
+			Vector3 half = desc.Size * 0.5f;
+			Vector3 min = pos - half;
+			Vector3 max = pos + half;
 			if (HoverTooltipScript.RayIntersectsAABB(rayOrigin, rayDir, min, max, out float t) && t >= 0 &&
 			    t < closestT)
 			{
@@ -135,18 +136,18 @@ public class HoverTooltipScript : SyncScript
 		if (closestBlock != null)
 		{
 			// The tower root is the parent of the block; its Name is the file name/path
-			var towerRoot = closestBlock.GetParent();
+			Entity? towerRoot = closestBlock.GetParent();
 			string fileName = towerRoot?.Name ?? closestBlock.Name;
 
 			// Compute the world hit position and project to screen space (normalized 0..1, top-left origin)
-			var hitPoint = rayOrigin + rayDir * closestT;
+			Vector3 hitPoint = rayOrigin + rayDir * closestT;
 			Vector3 screenNorm = this._camera.WorldToScreenPoint(hitPoint);
 
 			// Convert to pixel coordinates without Y inversion (DebugText expects top-left origin)
-			var backBuffer = this.GraphicsDevice.Presenter?.BackBuffer;
+			Texture? backBuffer = this.GraphicsDevice.Presenter?.BackBuffer;
 			int width = backBuffer?.Width ?? 0;
 			int height = backBuffer?.Height ?? 0;
-			var screenPos = new Int2((int)(screenNorm.X * width) + 16, (int)(screenNorm.Y * height) + 16);
+			Int2 screenPos = new Int2((int)(screenNorm.X * width) + 16, (int)(screenNorm.Y * height) + 16);
 
 			// Print for this frame (call every frame while hovering)
 			(this.Game as Game)?.DebugTextSystem?.Print(fileName, screenPos, Color4.White);
@@ -161,7 +162,7 @@ public class HoverTooltipScript : SyncScript
 		}
 
 		// Recurse into children
-		foreach (var child in entity.Transform.Children)
+		foreach (TransformComponent? child in entity.Transform.Children)
 		{
 			if (child.Entity != null)
 			{

@@ -1,6 +1,5 @@
 ﻿namespace CodeChangeVisualizer.Runner;
 
-using System.Diagnostics;
 using System.Text.Json;
 using CodeChangeVisualizer.Analyzer;
 using CodeChangeVisualizer.Viewer;
@@ -125,12 +124,12 @@ public class Program
 			if (!string.IsNullOrWhiteSpace(config.GitStart))
 			{
 				// Advanced git mode
-				var log = await GitHistoryAnalyzer.RunAdvancedGitAnalysisAsync(
+				RevisionLog log = await GitHistoryAnalyzer.RunAdvancedGitAnalysisAsync(
 					config.Directory!,
 					config.GitStart!,
 					config.IgnorePatterns.Count > 0 ? config.IgnorePatterns : null,
 					config.FileExtensions.Count > 0 ? config.FileExtensions : null);
-				var json = JsonSerializer.Serialize(log, new JsonSerializerOptions
+				string json = JsonSerializer.Serialize(log, new JsonSerializerOptions
 				{
 					WriteIndented = true,
 					PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -193,8 +192,6 @@ public class Program
 			Console.WriteLine($"Error: {ex.Message}");
 		}
 	}
-
-
 
 
 	private static async Task<Configuration> LoadConfigurationFromFile(string configFile, Configuration baseConfig)
@@ -300,5 +297,4 @@ public class Program
 		Console.WriteLine("  # Backward compatibility (outputs JSON to console)");
 		Console.WriteLine("  CodeChangeVisualizer.Runner ./src");
 	}
-
 }

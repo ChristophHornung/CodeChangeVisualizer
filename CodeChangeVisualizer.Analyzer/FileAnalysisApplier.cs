@@ -111,7 +111,7 @@ public static class FileAnalysisApplier
 
 		// Recompute Start indices to be contiguous starting at 0
 		int start = 0;
-		foreach (var g in result)
+		foreach (LineGroup g in result)
 		{
 			g.Start = start;
 			start += g.Length;
@@ -144,7 +144,7 @@ public static class FileAnalysisApplier
 			case FileAnalysisChangeKind.FileAdd:
 			{
 				// Use provided blocks (deep copy) and recompute Start
-				var lines = (diff.NewFileLines ?? new List<LineGroup>())
+				List<LineGroup> lines = (diff.NewFileLines ?? new List<LineGroup>())
 					.Select(g => new LineGroup { Type = g.Type, Length = g.Length })
 					.ToList();
 				FileAnalysisApplier.RecomputeStarts(lines);
@@ -165,7 +165,7 @@ public static class FileAnalysisApplier
 			case FileAnalysisChangeKind.Modify:
 			default:
 			{
-				var edits = diff.Edits ?? new List<DiffEdit>();
+				List<DiffEdit> edits = diff.Edits ?? new List<DiffEdit>();
 				return FileAnalysisApplier.Apply(oldFile, edits, newFileName ?? diff.NewFileName);
 			}
 		}
@@ -174,7 +174,7 @@ public static class FileAnalysisApplier
 	private static void RecomputeStarts(List<LineGroup> list)
 	{
 		int start = 0;
-		foreach (var g in list)
+		foreach (LineGroup g in list)
 		{
 			g.Start = start;
 			start += g.Length;

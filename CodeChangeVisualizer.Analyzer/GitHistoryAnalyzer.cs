@@ -26,29 +26,31 @@ public static class GitHistoryAnalyzer
 		string workDir = Path.GetFullPath(workingDirectory);
 
 		// Ensure clean working directory
-		string status = await RunGitAsync("status --porcelain", workDir);
+		string status = await GitHistoryAnalyzer.RunGitAsync("status --porcelain", workDir);
 		if (!string.IsNullOrWhiteSpace(status))
 		{
-			throw new InvalidOperationException("Git working tree has local changes. Please commit or stash before running advanced analysis.");
+			throw new InvalidOperationException(
+				"Git working tree has local changes. Please commit or stash before running advanced analysis.");
 		}
 
-		string originalRef = (await RunGitAsync("rev-parse --abbrev-ref HEAD", workDir)).Trim();
-		string originalSha = (await RunGitAsync("rev-parse HEAD", workDir)).Trim();
-		bool restoreBySha = string.Equals(originalRef, "HEAD", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(originalRef);
+		string originalRef = (await GitHistoryAnalyzer.RunGitAsync("rev-parse --abbrev-ref HEAD", workDir)).Trim();
+		string originalSha = (await GitHistoryAnalyzer.RunGitAsync("rev-parse HEAD", workDir)).Trim();
+		bool restoreBySha = string.Equals(originalRef, "HEAD", StringComparison.OrdinalIgnoreCase) ||
+		                    string.IsNullOrWhiteSpace(originalRef);
 
-		string startSha = (await RunGitAsync($"rev-parse {gitStart}", workDir)).Trim();
+		string startSha = (await GitHistoryAnalyzer.RunGitAsync($"rev-parse {gitStart}", workDir)).Trim();
 		if (string.IsNullOrWhiteSpace(startSha))
 		{
 			throw new InvalidOperationException($"Cannot resolve start git hash '{gitStart}'.");
 		}
 
 		// Commits after start (excluding start)
-		string list = await RunGitAsync($"rev-list --reverse {startSha}..HEAD", workDir);
+		string list = await GitHistoryAnalyzer.RunGitAsync($"rev-list --reverse {startSha}..HEAD", workDir);
 		List<string> commits = list.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).ToList();
 		// Include start as first
 		commits.Insert(0, startSha);
 
-		var log = new RevisionLog();
+		RevisionLog log = new RevisionLog();
 
 		List<FileAnalysis>? prev = null;
 		try
@@ -56,7 +58,7 @@ public static class GitHistoryAnalyzer
 			for (int idx = 0; idx < commits.Count; idx++)
 			{
 				string sha = commits[idx];
-				await RunGitAsync($"checkout --quiet {sha}", workDir);
+				await GitHistoryAnalyzer.RunGitAsync($"checkout --quiet {sha}", workDir);
 
 				CodeAnalyzer analyzer = new CodeAnalyzer();
 				DirectoryAnalysis currentAll = await analyzer.AnalyzeDirectoryAsync(
@@ -71,9 +73,10 @@ public static class GitHistoryAnalyzer
 				}
 				else
 				{
-					var diff = ComputeDiff(prev, current);
+					List<FileChangeEntry> diff = GitHistoryAnalyzer.ComputeDiff(prev, current);
 					log.Revisions.Add(new RevisionEntry { Commit = sha, Diff = diff });
 				}
+
 				prev = current;
 			}
 		}
@@ -81,7 +84,7 @@ public static class GitHistoryAnalyzer
 		{
 			// Restore original ref
 			string target = restoreBySha ? originalSha : originalRef;
-			await RunGitAsync($"checkout --quiet {target}", workDir);
+			await GitHistoryAnalyzer.RunGitAsync($"checkout --quiet {target}", workDir);
 		}
 
 		return log;
@@ -89,30 +92,33 @@ public static class GitHistoryAnalyzer
 
 	private static List<FileChangeEntry> ComputeDiff(List<FileAnalysis> oldAnalyses, List<FileAnalysis> newAnalyses)
 	{
-		var result = new List<FileChangeEntry>();
-		var oldMap = oldAnalyses.ToDictionary(f => f.File, f => f);
-		var newMap = newAnalyses.ToDictionary(f => f.File, f => f);
+		List<FileChangeEntry> result = new List<FileChangeEntry>();
+		Dictionary<string, FileAnalysis> oldMap = oldAnalyses.ToDictionary(f => f.File, f => f);
+		Dictionary<string, FileAnalysis> newMap = newAnalyses.ToDictionary(f => f.File, f => f);
 
 		// Removed files
-		foreach (var kv in oldMap)
+		foreach (KeyValuePair<string, FileAnalysis> kv in oldMap)
 		{
 			if (!newMap.ContainsKey(kv.Key))
 			{
-				var fd = FileDiffer.DiffFile(kv.Value, new FileAnalysis { File = kv.Key, Lines = new List<LineGroup>() });
+				FileDiff fd = FileDiffer.DiffFile(kv.Value,
+					new FileAnalysis { File = kv.Key, Lines = new List<LineGroup>() });
 				result.Add(new FileChangeEntry { File = kv.Key, Change = FileAnalysisDiff.FromFileDiff(fd) });
 			}
 		}
+
 		// Added and modified files
-		foreach (var kv in newMap)
+		foreach (KeyValuePair<string, FileAnalysis> kv in newMap)
 		{
-			if (!oldMap.TryGetValue(kv.Key, out var oldFa))
+			if (!oldMap.TryGetValue(kv.Key, out FileAnalysis? oldFa))
 			{
-				var fd = FileDiffer.DiffFile(new FileAnalysis { File = kv.Key, Lines = new List<LineGroup>() }, kv.Value);
+				FileDiff fd = FileDiffer.DiffFile(new FileAnalysis { File = kv.Key, Lines = new List<LineGroup>() },
+					kv.Value);
 				result.Add(new FileChangeEntry { File = kv.Key, Change = FileAnalysisDiff.FromFileDiff(fd) });
 			}
 			else
 			{
-				var fd = FileDiffer.DiffFile(oldFa, kv.Value);
+				FileDiff fd = FileDiffer.DiffFile(oldFa, kv.Value);
 				// Skip no-op modify (no edits)
 				if (fd.Kind != FileChangeKind.Modify || (fd.Edits != null && fd.Edits.Count > 0))
 				{
@@ -127,7 +133,7 @@ public static class GitHistoryAnalyzer
 
 	private static async Task<string> RunGitAsync(string arguments, string workingDirectory)
 	{
-		var psi = new ProcessStartInfo
+		ProcessStartInfo psi = new()
 		{
 			FileName = "git",
 			Arguments = arguments,
@@ -137,7 +143,7 @@ public static class GitHistoryAnalyzer
 			RedirectStandardError = true,
 			CreateNoWindow = true
 		};
-		using var proc = Process.Start(psi)!;
+		using Process proc = Process.Start(psi)!;
 		string stdout = await proc.StandardOutput.ReadToEndAsync();
 		string stderr = await proc.StandardError.ReadToEndAsync();
 		await proc.WaitForExitAsync();
@@ -145,51 +151,7 @@ public static class GitHistoryAnalyzer
 		{
 			throw new InvalidOperationException($"git {arguments} failed: {stderr}");
 		}
+
 		return stdout;
 	}
-}
-
-/// <summary>
-/// Root container for the list of analyzed revisions.
-/// </summary>
-public class RevisionLog
-{
-	/// <summary>
-	/// The chronological list of revisions. The first contains full analysis; others contain diffs.
-	/// </summary>
-	public List<RevisionEntry> Revisions { get; set; } = new();
-}
-
-/// <summary>
-/// Represents a single revision entry: either a full analysis (first) or a diff.
-/// </summary>
-public class RevisionEntry
-{
-	/// <summary>
-	/// The commit SHA for this entry.
-	/// </summary>
-	public string Commit { get; set; } = string.Empty;
-	/// <summary>
-	/// The full analysis for the first commit; null otherwise.
-	/// </summary>
-	public List<FileAnalysis>? Analysis { get; set; }
-	/// <summary>
-	/// The diff to the previous commit for subsequent entries; null for the first.
-	/// </summary>
-	public List<FileChangeEntry>? Diff { get; set; }
-}
-
-/// <summary>
-/// Represents a per-file change within a revision, including block-level or file-level diffs.
-/// </summary>
-public class FileChangeEntry
-{
-	/// <summary>
-	/// The relative file path.
-	/// </summary>
-	public string File { get; set; } = string.Empty;
-	/// <summary>
-	/// The change description for the file.
-	/// </summary>
-	public FileAnalysisDiff Change { get; set; } = new();
 }
