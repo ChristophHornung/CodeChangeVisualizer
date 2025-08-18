@@ -50,25 +50,36 @@ public class SkyscraperVisualizer
 	/// </summary>
 	private void BuildTowers(Scene scene, List<FileAnalysis> analysis, Game game)
 	{
-		float towerX = 0f;
+		// Arrange towers in a square grid (city block) rather than a single line
+		int count = analysis.Count;
+		if (count == 0)
+			return;
+
+		int gridSize = (int)Math.Ceiling(Math.Sqrt(count));
+		int index = 0;
 		foreach (FileAnalysis file in analysis)
 		{
-			Entity fileRoot = this.CreateTowerRoot(file, towerX);
+			int row = index / gridSize;
+			int col = index % gridSize;
+			float x = col * SkyscraperVisualizer.TowerSpacing;
+			float z = row * SkyscraperVisualizer.TowerSpacing;
+
+			Entity fileRoot = this.CreateTowerRoot(file, x, z);
 			scene.Entities.Add(fileRoot);
 
 			this.BuildTowerBlocks(file, fileRoot, game);
 
-			towerX += SkyscraperVisualizer.TowerSpacing;
+			index++;
 		}
 	}
 
 	/// <summary>
 	/// Creates the root entity for a tower.
 	/// </summary>
-	private Entity CreateTowerRoot(FileAnalysis file, float towerX)
+	private Entity CreateTowerRoot(FileAnalysis file, float x, float z)
 	{
 		Entity fileRoot = new Entity(file.File);
-		fileRoot.Transform.Position = new Vector3(towerX, 0f, 0f);
+		fileRoot.Transform.Position = new Vector3(x, 0f, z);
 		return fileRoot;
 	}
 
@@ -102,7 +113,8 @@ public class SkyscraperVisualizer
         // Create a cube using Community Toolkit primitives with size options
         Primitive3DCreationOptions createOptions = new Primitive3DCreationOptions
         {
-            Size = new Vector3(SkyscraperVisualizer.BlockWidth, height, SkyscraperVisualizer.BlockDepth)
+            Size = new Vector3(SkyscraperVisualizer.BlockWidth, height, SkyscraperVisualizer.BlockDepth),
+            IncludeCollider = false
         };
         
         Entity cube = game.Create3DPrimitive(PrimitiveModelType.Cube, createOptions);
