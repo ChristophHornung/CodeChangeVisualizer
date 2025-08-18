@@ -124,4 +124,45 @@ public class DifferTests
         Assert.Equal(LineType.Empty, edits[2].LineType);
         Assert.Equal(1, edits[2].NewLength);
     }
+    
+    [Fact]
+    public void NewFile_ShouldProduceAllInserts()
+    {
+        var oldFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
+        var newFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup> { 
+            new LineGroup { Type = LineType.Code, Length = 5 },
+            new LineGroup { Type = LineType.Comment, Length = 2 }
+        } };
+
+        var edits = Differ.Diff(oldFa, newFa);
+        Assert.Equal(2, edits.Count);
+        Assert.All(edits, e => Assert.Equal(DiffOpType.Insert, e.Kind));
+        Assert.Equal(0, edits[0].Index);
+        Assert.Equal(LineType.Code, edits[0].LineType);
+        Assert.Equal(5, edits[0].NewLength);
+        Assert.Equal(1, edits[1].Index);
+        Assert.Equal(LineType.Comment, edits[1].LineType);
+        Assert.Equal(2, edits[1].NewLength);
+    }
+
+    [Fact]
+    public void DeletedFile_ShouldProduceAllRemoves()
+    {
+        var oldFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup> {
+            new LineGroup { Type = LineType.Code, Length = 5 },
+            new LineGroup { Type = LineType.Comment, Length = 2 }
+        } };
+        var newFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
+
+        var edits = Differ.Diff(oldFa, newFa);
+        Assert.Equal(2, edits.Count);
+        Assert.All(edits, e => Assert.Equal(DiffOpType.Remove, e.Kind));
+        // Order: removes from old indices 0 then 1 (greedy), or possibly 0 then 1
+        Assert.Equal(0, edits[0].Index);
+        Assert.Equal(LineType.Code, edits[0].LineType);
+        Assert.Equal(5, edits[0].OldLength);
+        Assert.Equal(1, edits[1].Index);
+        Assert.Equal(LineType.Comment, edits[1].LineType);
+        Assert.Equal(2, edits[1].OldLength);
+    }
 }

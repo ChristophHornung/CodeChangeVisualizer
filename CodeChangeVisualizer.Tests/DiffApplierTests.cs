@@ -1,6 +1,7 @@
 ﻿namespace CodeChangeVisualizer.Tests;
 
 using CodeChangeVisualizer.Analyzer;
+using DiffApplier = CodeChangeVisualizer.Analyzer.FileAnalysisApplier;
 
 public class DiffApplierTests
 {
@@ -152,5 +153,45 @@ public class DiffApplierTests
         };
 
         AssertSameSequence(expected, patched);
+    }
+    
+    [Fact]
+    public void Roundtrip_NewFile_FromEmpty()
+    {
+        var oldFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
+        var newFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup> {
+            new LineGroup { Type = LineType.Code, Length = 5 },
+            new LineGroup { Type = LineType.Comment, Length = 2 },
+        } };
+
+        var edits = Differ.Diff(oldFa, newFa);
+        var patched = DiffApplier.Apply(oldFa, edits);
+
+        Assert.Equal(2, edits.Count);
+        Assert.All(edits, e => Assert.Equal(DiffOpType.Insert, e.Kind));
+        // Verify result equals new file
+        Assert.Equal(newFa.Lines.Count, patched.Lines.Count);
+        for (int i = 0; i < newFa.Lines.Count; i++)
+        {
+            Assert.Equal(newFa.Lines[i].Type, patched.Lines[i].Type);
+            Assert.Equal(newFa.Lines[i].Length, patched.Lines[i].Length);
+        }
+    }
+
+    [Fact]
+    public void Roundtrip_DeletedFile_ToEmpty()
+    {
+        var oldFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup> {
+            new LineGroup { Type = LineType.Code, Length = 5 },
+            new LineGroup { Type = LineType.Comment, Length = 2 },
+        } };
+        var newFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
+
+        var edits = Differ.Diff(oldFa, newFa);
+        var patched = DiffApplier.Apply(oldFa, edits);
+
+        Assert.Equal(2, edits.Count);
+        Assert.All(edits, e => Assert.Equal(DiffOpType.Remove, e.Kind));
+        Assert.Empty(patched.Lines);
     }
 }

@@ -1,7 +1,15 @@
 ﻿namespace CodeChangeVisualizer.Analyzer;
 
-[System.Obsolete("Use FileAnalysisApplier.Apply")]
-public static class DiffApplier
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+/// <summary>
+/// Unified applier that can apply either block-level edits (IEnumerable&lt;DiffEdit&gt;)
+/// or a higher-level FileAnalysisDiff (FileAdd/FileDelete/Modify).
+/// This centralizes the logic into a single class as requested.
+/// </summary>
+public static class FileAnalysisApplier
 {
     /// <summary>
     /// Applies a sequence of diff edits to the given <paramref name="oldFile"/> and produces a new FileAnalysis.
@@ -110,5 +118,55 @@ public static class DiffApplier
             File = newFileName ?? oldFile.File,
             Lines = result
         };
+    }
+
+    /// <summary>
+    /// Applies a unified FileAnalysisDiff to <paramref name="oldFile"/>.
+    /// </summary>
+    public static FileAnalysis Apply(FileAnalysis oldFile, FileAnalysisDiff diff, string? newFileName = null)
+    {
+        if (oldFile == null) throw new ArgumentNullException(nameof(oldFile));
+        if (diff == null) throw new ArgumentNullException(nameof(diff));
+
+        switch (diff.Kind)
+        {
+            case FileAnalysisChangeKind.FileAdd:
+            {
+                // Use provided blocks (deep copy) and recompute Start
+                var lines = (diff.NewFileLines ?? new List<LineGroup>())
+                    .Select(g => new LineGroup { Type = g.Type, Length = g.Length })
+                    .ToList();
+                RecomputeStarts(lines);
+                return new FileAnalysis
+                {
+                    File = newFileName ?? diff.NewFileName ?? oldFile.File,
+                    Lines = lines
+                };
+            }
+            case FileAnalysisChangeKind.FileDelete:
+            {
+                return new FileAnalysis
+                {
+                    File = newFileName ?? diff.NewFileName ?? oldFile.File,
+                    Lines = new List<LineGroup>()
+                };
+            }
+            case FileAnalysisChangeKind.Modify:
+            default:
+            {
+                var edits = diff.Edits ?? new List<DiffEdit>();
+                return Apply(oldFile, edits, newFileName ?? diff.NewFileName);
+            }
+        }
+    }
+
+    private static void RecomputeStarts(List<LineGroup> list)
+    {
+        int start = 0;
+        foreach (var g in list)
+        {
+            g.Start = start;
+            start += g.Length;
+        }
     }
 }
