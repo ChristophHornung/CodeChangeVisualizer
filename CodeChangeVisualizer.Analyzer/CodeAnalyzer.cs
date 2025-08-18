@@ -2,9 +2,19 @@ namespace CodeChangeVisualizer.Analyzer;
 
 using System.Text.RegularExpressions;
 
+/// <summary>
+/// Provides functionality to analyze source files and classify contiguous line groups by type.
+/// </summary>
 public class CodeAnalyzer
 {
-	public async Task<List<FileAnalysis>> AnalyzeDirectoryAsync(string directoryPath,
+ /// <summary>
+/// Analyzes all files within the specified directory and returns their analyses.
+/// </summary>
+/// <param name="directoryPath">The root directory to analyze.</param>
+/// <param name="ignorePatterns">Optional regex patterns (relative paths) to exclude.</param>
+/// <param name="fileExtensions">Optional file glob patterns (e.g., "*.cs"); defaults to C# files.</param>
+/// <returns>A list of <see cref="FileAnalysis"/> results, one per file.</returns>
+public async Task<List<FileAnalysis>> AnalyzeDirectoryAsync(string directoryPath,
 		List<string>? ignorePatterns = null, List<string>? fileExtensions = null)
 	{
 		List<FileAnalysis> results = [];
@@ -32,14 +42,26 @@ public class CodeAnalyzer
 		return results;
 	}
 
-	public async Task<FileAnalysis> AnalyzeFileAsync(Stream stream, string relativePath)
+ /// <summary>
+/// Analyzes the content of a file from a stream.
+/// </summary>
+/// <param name="stream">The stream to read the file contents from.</param>
+/// <param name="relativePath">The file path relative to the analyzed root directory.</param>
+/// <returns>The computed <see cref="FileAnalysis"/>.</returns>
+public async Task<FileAnalysis> AnalyzeFileAsync(Stream stream, string relativePath)
 	{
 		using StreamReader reader = new(stream);
 		string[] lines = (await reader.ReadToEndAsync()).Split([Environment.NewLine], StringSplitOptions.None);
 		return await this.AnalyzeFileAsync(relativePath, lines);
 	}
 
-	public async Task<FileAnalysis> AnalyzeFileAsync(string filePath, string relativePath)
+ /// <summary>
+/// Analyzes the content of a file from disk.
+/// </summary>
+/// <param name="filePath">The absolute path to the file on disk.</param>
+/// <param name="relativePath">The file path relative to the analyzed root directory.</param>
+/// <returns>The computed <see cref="FileAnalysis"/>.</returns>
+public async Task<FileAnalysis> AnalyzeFileAsync(string filePath, string relativePath)
 	{
 		if (!File.Exists(filePath))
 		{
@@ -50,7 +72,14 @@ public class CodeAnalyzer
 		return await this.AnalyzeFileAsync(relativePath, lines);
 	}
 
-	private List<string> FilterFiles(List<string> files, string baseDirectory, List<string>? ignorePatterns)
+ /// <summary>
+/// Filters a list of files by optional regex ignore patterns relative to a base directory.
+/// </summary>
+/// <param name="files">The full paths of candidate files.</param>
+/// <param name="baseDirectory">The root directory to compute relative paths from.</param>
+/// <param name="ignorePatterns">Optional regex patterns to exclude.</param>
+/// <returns>The filtered list of file paths.</returns>
+private List<string> FilterFiles(List<string> files, string baseDirectory, List<string>? ignorePatterns)
 	{
 		if (ignorePatterns == null || ignorePatterns.Count == 0)
 		{
@@ -90,7 +119,13 @@ public class CodeAnalyzer
 		return filteredFiles;
 	}
 
-	private Task<FileAnalysis> AnalyzeFileAsync(string relativePath, string[] lines)
+ /// <summary>
+/// Analyzes a file from provided lines.
+/// </summary>
+/// <param name="relativePath">The file path relative to the analyzed root directory.</param>
+/// <param name="lines">The lines of the file content.</param>
+/// <returns>The computed <see cref="FileAnalysis"/>.</returns>
+private Task<FileAnalysis> AnalyzeFileAsync(string relativePath, string[] lines)
 	{
 		List<LineGroup> lineGroups = [];
 
@@ -143,7 +178,12 @@ public class CodeAnalyzer
 		});
 	}
 
-	private LineType DetermineLineType(string line)
+ /// <summary>
+/// Determines the <see cref="LineType"/> for a given line.
+/// </summary>
+/// <param name="line">The raw line content.</param>
+/// <returns>The detected <see cref="LineType"/>.</returns>
+private LineType DetermineLineType(string line)
 	{
 		string trimmedLine = line.Trim();
 
@@ -174,7 +214,12 @@ public class CodeAnalyzer
 		return LineType.Code;
 	}
 
-	private bool IsPureCommentLine(string line)
+ /// <summary>
+/// Determines if a line is purely a comment line.
+/// </summary>
+/// <param name="line">The raw line content.</param>
+/// <returns>True if the line contains only comment markers; otherwise, false.</returns>
+private bool IsPureCommentLine(string line)
 	{
 		string trimmed = line.Trim();
 		return trimmed.StartsWith("//") ||
@@ -184,7 +229,12 @@ public class CodeAnalyzer
 		       trimmed.StartsWith("*/");
 	}
 
-	private bool HasCodeAndComments(string line)
+ /// <summary>
+/// Determines if a line contains both code and an inline comment.
+/// </summary>
+/// <param name="line">The raw line content.</param>
+/// <returns>True if both code and a comment are present; otherwise, false.</returns>
+private bool HasCodeAndComments(string line)
 	{
 		string trimmed = line.Trim();
 
@@ -197,7 +247,12 @@ public class CodeAnalyzer
 		return false;
 	}
 
-	private bool IsComplexityIncreasingLine(string line)
+ /// <summary>
+/// Checks if a line likely increases cyclomatic complexity (keywords like if, for, switch, etc.).
+/// </summary>
+/// <param name="line">The raw line content.</param>
+/// <returns>True if it likely increases complexity; otherwise, false.</returns>
+private bool IsComplexityIncreasingLine(string line)
 	{
 		string trimmed = line.Trim();
 		string[] complexityKeywords =
@@ -226,7 +281,12 @@ public class CodeAnalyzer
 	}
 
 
-	private string RemoveComments(string line)
+ /// <summary>
+/// Removes single-line and XML documentation comments from the provided line.
+/// </summary>
+/// <param name="line">The line to strip comments from.</param>
+/// <returns>The line with comments removed.</returns>
+private string RemoveComments(string line)
 	{
 		// Remove single-line comments
 		int singleLineCommentIndex = line.IndexOf("//");

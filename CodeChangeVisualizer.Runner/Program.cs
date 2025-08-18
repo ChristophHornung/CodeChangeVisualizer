@@ -70,6 +70,12 @@ public class Program
 				case "-h":
 					Program.PrintUsage();
 					return;
+				case "--git-start":
+					if (i + 1 < args.Length)
+					{
+						config.GitStart = args[++i];
+					}
+					break;
 				default:
 					// If no flag is provided, treat as directory path (backward compatibility)
 					if (config.Directory == null)
@@ -114,47 +120,216 @@ public class Program
 
 		try
 		{
-			CodeAnalyzer analyzer = new CodeAnalyzer();
-			List<FileAnalysis> results = await analyzer.AnalyzeDirectoryAsync(
-				config.Directory,
-				config.IgnorePatterns.Count > 0 ? config.IgnorePatterns : null,
-				config.FileExtensions.Count > 0 ? config.FileExtensions : null);
-
-			// Output JSON to console if requested
-			if (config.OutputToConsole)
+			if (!string.IsNullOrWhiteSpace(config.GitStart))
 			{
-				string jsonOutput = JsonSerializer.Serialize(results, new JsonSerializerOptions
+				// Advanced git mode
+				var log = await RunAdvancedGitAnalysisAsync(config);
+				var json = JsonSerializer.Serialize(log, new JsonSerializerOptions
 				{
 					WriteIndented = true,
 					PropertyNamingPolicy = JsonNamingPolicy.CamelCase
 				});
-				Console.WriteLine(jsonOutput);
-			}
-
-			// Output JSON to file if requested
-			if (config.JsonOutput != null)
-			{
-				string jsonOutput = JsonSerializer.Serialize(results, new JsonSerializerOptions
+				if (config.OutputToConsole)
 				{
-					WriteIndented = true,
-					PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-				});
-				await File.WriteAllTextAsync(config.JsonOutput, jsonOutput);
-				Console.WriteLine($"JSON analysis saved to: {config.JsonOutput}");
+					Console.WriteLine(json);
+				}
+				if (!string.IsNullOrEmpty(config.JsonOutput))
+				{
+					await File.WriteAllTextAsync(config.JsonOutput!, json);
+					Console.WriteLine($"Advanced analysis JSON saved to: {config.JsonOutput}");
+				}
+				if (!string.IsNullOrEmpty(config.VisualizationOutput))
+				{
+					Console.WriteLine("Visualization is not supported in advanced git mode; ignoring --visualization.");
+				}
 			}
-
-			// Generate visualization if requested
-			if (config.VisualizationOutput != null)
+			else
 			{
-				CodeVisualizer visualizer = new CodeVisualizer();
-				visualizer.GenerateVisualization(results, config.VisualizationOutput);
-				Console.WriteLine($"Visualization saved to: {config.VisualizationOutput}");
+				// Regular single analysis mode
+				CodeAnalyzer analyzer = new CodeAnalyzer();
+				List<FileAnalysis> results = await analyzer.AnalyzeDirectoryAsync(
+					config.Directory,
+					config.IgnorePatterns.Count > 0 ? config.IgnorePatterns : null,
+					config.FileExtensions.Count > 0 ? config.FileExtensions : null);
+
+				// Output JSON to console if requested
+				if (config.OutputToConsole)
+				{
+					string jsonOutput = JsonSerializer.Serialize(results, new JsonSerializerOptions
+					{
+						WriteIndented = true,
+						PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+					});
+					Console.WriteLine(jsonOutput);
+				}
+
+				// Output JSON to file if requested
+				if (config.JsonOutput != null)
+				{
+					string jsonOutput = JsonSerializer.Serialize(results, new JsonSerializerOptions
+					{
+						WriteIndented = true,
+						PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+					});
+					await File.WriteAllTextAsync(config.JsonOutput, jsonOutput);
+					Console.WriteLine($"JSON analysis saved to: {config.JsonOutput}");
+				}
+
+				// Generate visualization if requested
+				if (config.VisualizationOutput != null)
+				{
+					CodeVisualizer visualizer = new CodeVisualizer();
+					visualizer.GenerateVisualization(results, config.VisualizationOutput);
+					Console.WriteLine($"Visualization saved to: {config.VisualizationOutput}");
+				}
 			}
 		}
 		catch (Exception ex)
 		{
 			Console.WriteLine($"Error: {ex.Message}");
 		}
+	}
+
+	// Advanced git analysis data models
+	public class RevisionLog
+	{
+		public List<RevisionEntry> Revisions { get; set; } = new();
+	}
+	public class RevisionEntry
+	{
+		public string Commit { get; set; } = string.Empty;
+		public List<FileAnalysis>? Analysis { get; set; }
+		public List<FileChangeEntry>? Diff { get; set; }
+	}
+	public class FileChangeEntry
+	{
+		public string File { get; set; } = string.Empty;
+		public FileAnalysisDiff Change { get; set; } = new();
+	}
+
+	private static async Task<RevisionLog> RunAdvancedGitAnalysisAsync(Configuration config)
+	{
+		string workDir = Path.GetFullPath(config.Directory!);
+		// Ensure clean working directory
+		string status = await RunGitAsync("status --porcelain", workDir);
+		if (!string.IsNullOrWhiteSpace(status))
+		{
+			throw new InvalidOperationException("Git working tree has local changes. Please commit or stash before running advanced analysis.");
+		}
+
+		string originalRef = (await RunGitAsync("rev-parse --abbrev-ref HEAD", workDir)).Trim();
+		string originalSha = (await RunGitAsync("rev-parse HEAD", workDir)).Trim();
+		bool restoreBySha = string.Equals(originalRef, "HEAD", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(originalRef);
+
+		string startSha = (await RunGitAsync($"rev-parse {config.GitStart}", workDir)).Trim();
+		if (string.IsNullOrWhiteSpace(startSha))
+		{
+			throw new InvalidOperationException($"Cannot resolve start git hash '{config.GitStart}'.");
+		}
+
+		// Commits after start (excluding start)
+		string list = await RunGitAsync($"rev-list --reverse {startSha}..HEAD", workDir);
+		List<string> commits = list.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+		// Include start as first
+		commits.Insert(0, startSha);
+
+		var log = new RevisionLog();
+
+		List<FileAnalysis>? prev = null;
+		try
+		{
+			for (int idx = 0; idx < commits.Count; idx++)
+			{
+				string sha = commits[idx];
+				await RunGitAsync($"checkout --quiet {sha}", workDir);
+
+				CodeAnalyzer analyzer = new CodeAnalyzer();
+				List<FileAnalysis> current = await analyzer.AnalyzeDirectoryAsync(
+					workDir,
+					config.IgnorePatterns.Count > 0 ? config.IgnorePatterns : null,
+					config.FileExtensions.Count > 0 ? config.FileExtensions : null);
+
+				if (prev == null)
+				{
+					log.Revisions.Add(new RevisionEntry { Commit = sha, Analysis = current });
+				}
+				else
+				{
+					var diff = ComputeDiff(prev, current);
+					log.Revisions.Add(new RevisionEntry { Commit = sha, Diff = diff });
+				}
+				prev = current;
+			}
+		}
+		finally
+		{
+			// Restore original ref
+			string target = restoreBySha ? originalSha : originalRef;
+			await RunGitAsync($"checkout --quiet {target}", workDir);
+		}
+
+		return log;
+	}
+
+	private static List<FileChangeEntry> ComputeDiff(List<FileAnalysis> oldAnalyses, List<FileAnalysis> newAnalyses)
+	{
+		var result = new List<FileChangeEntry>();
+		var oldMap = oldAnalyses.ToDictionary(f => f.File, f => f);
+		var newMap = newAnalyses.ToDictionary(f => f.File, f => f);
+
+		// Removed files
+		foreach (var kv in oldMap)
+		{
+			if (!newMap.ContainsKey(kv.Key))
+			{
+				var fd = FileDiffer.DiffFile(kv.Value, new FileAnalysis { File = kv.Key, Lines = new List<LineGroup>() });
+				result.Add(new FileChangeEntry { File = kv.Key, Change = FileAnalysisDiff.FromFileDiff(fd) });
+			}
+		}
+		// Added and modified files
+		foreach (var kv in newMap)
+		{
+			if (!oldMap.TryGetValue(kv.Key, out var oldFa))
+			{
+				var fd = FileDiffer.DiffFile(new FileAnalysis { File = kv.Key, Lines = new List<LineGroup>() }, kv.Value);
+				result.Add(new FileChangeEntry { File = kv.Key, Change = FileAnalysisDiff.FromFileDiff(fd) });
+			}
+			else
+			{
+				var fd = FileDiffer.DiffFile(oldFa, kv.Value);
+				// Skip no-op modify (no edits)
+				if (fd.Kind != FileChangeKind.Modify || (fd.Edits != null && fd.Edits.Count > 0))
+				{
+					result.Add(new FileChangeEntry { File = kv.Key, Change = FileAnalysisDiff.FromFileDiff(fd) });
+				}
+			}
+		}
+
+		// Order by file for deterministic output
+		return result.OrderBy(e => e.File, StringComparer.OrdinalIgnoreCase).ToList();
+	}
+
+	private static async Task<string> RunGitAsync(string arguments, string workingDirectory)
+	{
+		var psi = new System.Diagnostics.ProcessStartInfo
+		{
+			FileName = "git",
+			Arguments = arguments,
+			WorkingDirectory = workingDirectory,
+			UseShellExecute = false,
+			RedirectStandardOutput = true,
+			RedirectStandardError = true,
+			CreateNoWindow = true
+		};
+		using var proc = System.Diagnostics.Process.Start(psi)!;
+		string stdout = await proc.StandardOutput.ReadToEndAsync();
+		string stderr = await proc.StandardError.ReadToEndAsync();
+		await proc.WaitForExitAsync();
+		if (proc.ExitCode != 0)
+		{
+			throw new InvalidOperationException($"git {arguments} failed: {stderr}");
+		}
+		return stdout;
 	}
 
 	private static async Task<Configuration> LoadConfigurationFromFile(string configFile, Configuration baseConfig)
@@ -188,7 +363,8 @@ public class Program
 			VisualizationOutput = commandLineConfig.VisualizationOutput ?? fileConfig.VisualizationOutput,
 			OutputToConsole = commandLineConfig.OutputToConsole || fileConfig.OutputToConsole,
 			IgnorePatterns = new List<string>(fileConfig.IgnorePatterns),
-			FileExtensions = new List<string>(fileConfig.FileExtensions)
+			FileExtensions = new List<string>(fileConfig.FileExtensions),
+			GitStart = commandLineConfig.GitStart ?? fileConfig.GitStart
 		};
 
 		// Add command line ignore patterns
@@ -212,6 +388,7 @@ public class Program
 		Console.WriteLine("  -v, --visualization <file> Output PNG visualization to file");
 		Console.WriteLine("  -c, --console              Output JSON analysis to console");
 		Console.WriteLine("  -i, --ignore <pattern>     Regex pattern to ignore files (can be used multiple times)");
+		Console.WriteLine("      --git-start <hash>     Advanced mode: analyze all revisions from <hash> to current HEAD");
 		Console.WriteLine("  -h, --help                 Show this help message");
 		Console.WriteLine();
 		Console.WriteLine("Configuration File Format:");
@@ -224,7 +401,8 @@ public class Program
 		Console.WriteLine("      \"\\\\.git/.*\",");
 		Console.WriteLine("      \".*\\\\.generated\\\\.cs$\"");
 		Console.WriteLine("    ],");
-		Console.WriteLine("    \"fileExtensions\": [\"*.cs\", \"*.vb\"]");
+		Console.WriteLine("    \"fileExtensions\": [\"*.cs\", \"*.vb\"],");
+		Console.WriteLine("    \"gitStart\": null");
 		Console.WriteLine("  }");
 		Console.WriteLine();
 		Console.WriteLine("Examples:");
@@ -240,6 +418,10 @@ public class Program
 		Console.WriteLine("  # Generate both JSON and visualization");
 		Console.WriteLine(
 			"  CodeChangeVisualizer.Runner --directory ./src --json analysis.json --visualization output.png");
+		Console.WriteLine();
+		Console.WriteLine("  # Advanced git mode: analyze from a start commit to HEAD and emit first analysis then diffs");
+		Console.WriteLine(
+			"  CodeChangeVisualizer.Runner --directory ./repo/subdir --git-start <commit> --json advanced.json");
 		Console.WriteLine();
 		Console.WriteLine("  # Ignore files using regex patterns");
 		Console.WriteLine(

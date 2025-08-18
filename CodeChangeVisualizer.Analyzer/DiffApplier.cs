@@ -1,5 +1,11 @@
 ﻿namespace CodeChangeVisualizer.Analyzer;
 
+/// <summary>
+/// Applies a sequence of block-level <see cref="DiffEdit"/> operations to a <see cref="FileAnalysis"/>.
+/// </summary>
+/// <remarks>
+/// Obsolete: prefer <see cref="FileAnalysisApplier"/>.
+/// </remarks>
 [System.Obsolete("Use FileAnalysisApplier.Apply")]
 public static class DiffApplier
 {

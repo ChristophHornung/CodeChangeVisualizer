@@ -1,35 +1,65 @@
 ﻿namespace CodeChangeVisualizer.Analyzer;
 
+/// <summary>
+/// Describes the kind of block-level edit between two analyses.
+/// </summary>
 public enum DiffOpType
 {
+    /// <summary>An existing block changed its size in lines.</summary>
     Resize,
+    /// <summary>A new block was inserted.</summary>
     Insert,
+    /// <summary>An existing block was removed.</summary>
     Remove
 }
 
+/// <summary>
+/// Represents a single block-level edit operation between two file analyses.
+/// </summary>
 public record DiffEdit
 {
+    /// <summary>
+    /// Gets the kind of edit operation.
+    /// </summary>
     public DiffOpType Kind { get; init; }
 
-    // Index meaning by operation:
-    // - Insert: index in the NEW sequence where the block is inserted
-    // - Remove: index in the OLD sequence of the block being removed
-    // - Resize: index in the NEW sequence of the aligned block whose size changed
+    /// <summary>
+    /// The index interpretation depends on <see cref="Kind"/>:
+    /// Insert/Resize use the index in the NEW sequence; Remove uses the index in the OLD sequence.
+    /// </summary>
     public int Index { get; init; }
 
+    /// <summary>
+    /// The line type of the affected block. A block never changes its type; type changes are represented as remove+insert.
+    /// </summary>
     public LineType LineType { get; init; }
 
-    // For Resize: OldLength and NewLength are set; Delta = NewLength - OldLength
-    // For Insert: NewLength is set; OldLength is null; Delta = NewLength
-    // For Remove: OldLength is set; NewLength is null; Delta = -OldLength
+    /// <summary>
+    /// For Resize/Remove, the original length (lines). For Insert, null.
+    /// </summary>
     public int? OldLength { get; init; }
+    /// <summary>
+    /// For Resize/Insert, the new length (lines). For Remove, null.
+    /// </summary>
     public int? NewLength { get; init; }
 
+    /// <summary>
+    /// Convenience difference: NewLength - OldLength (missing values treated as 0).
+    /// </summary>
     public int Delta => (NewLength ?? 0) - (OldLength ?? 0);
 }
 
+/// <summary>
+/// Computes a minimal deterministic set of block-level edits between two file analyses.
+/// </summary>
 public static class Differ
 {
+    /// <summary>
+    /// Computes block edits to transform <paramref name="oldFile"/> into <paramref name="newFile"/>.
+    /// </summary>
+    /// <param name="oldFile">The source analysis.</param>
+    /// <param name="newFile">The target analysis.</param>
+    /// <returns>A list of <see cref="DiffEdit"/> operations.</returns>
     public static List<DiffEdit> Diff(FileAnalysis oldFile, FileAnalysis newFile)
     {
         List<LineGroup> a = oldFile.Lines;

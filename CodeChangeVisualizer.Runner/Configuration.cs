@@ -21,4 +21,8 @@ public class Configuration
 
 	[JsonPropertyName("fileExtensions")]
 	public List<string> FileExtensions { get; set; } = new() { "*.cs" };
+
+	// Advanced git analysis start commit hash (enables git mode when provided)
+	[JsonPropertyName("gitStart")]
+	public string? GitStart { get; set; }
 }

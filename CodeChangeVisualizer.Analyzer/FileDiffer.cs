@@ -1,7 +1,16 @@
 ﻿namespace CodeChangeVisualizer.Analyzer;
 
+/// <summary>
+/// Produces a file-level diff between two analyses, collapsing whole-file add/remove cases.
+/// </summary>
 public static class FileDiffer
 {
+    /// <summary>
+    /// Computes the <see cref="FileDiff"/> between <paramref name="oldFile"/> and <paramref name="newFile"/>.
+    /// </summary>
+    /// <param name="oldFile">The previous analysis of the file.</param>
+    /// <param name="newFile">The new analysis of the file.</param>
+    /// <returns>A <see cref="FileDiff"/> describing the change.</returns>
     public static FileDiff DiffFile(FileAnalysis oldFile, FileAnalysis newFile)
     {
         if (oldFile == null) throw new ArgumentNullException(nameof(oldFile));

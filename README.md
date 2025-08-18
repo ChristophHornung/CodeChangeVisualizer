@@ -9,7 +9,7 @@ testing.
 - **CodeChangeVisualizer.Runner**: Console application that uses the analyzer and viewer to process directories and
   generate visualizations
 - **CodeChangeVisualizer.Viewer**: Class library for generating PNG visualizations using SkiaSharp
-- **CodeChangeVisualizer.Stride**: Class library for generating a 3D tower-like visualization (skyscraper per file)
+- **CodeChangeVisualizer.StrideRunner**: App for generating a 3D tower-like visualization (skyscraper per file)
   using Stride
 - **CodeChangeVisualizer.Tests**: Unit tests for the analyzer functionality
 

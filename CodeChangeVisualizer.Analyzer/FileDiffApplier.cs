@@ -1,8 +1,21 @@
 ﻿namespace CodeChangeVisualizer.Analyzer;
 
+/// <summary>
+/// Applies <see cref="FileDiff"/> changes to a <see cref="FileAnalysis"/>.
+/// </summary>
+/// <remarks>
+/// Obsolete: prefer <see cref="FileAnalysisApplier.Apply(FileAnalysis, FileAnalysisDiff, string?)"/>.
+/// </remarks>
 [System.Obsolete("Use FileAnalysisApplier.Apply")]
 public static class FileDiffApplier
 {
+    /// <summary>
+    /// Applies the provided <paramref name="fileDiff"/> to <paramref name="oldFile"/> and returns the result.
+    /// </summary>
+    /// <param name="oldFile">The original analysis of the file.</param>
+    /// <param name="fileDiff">The diff to apply.</param>
+    /// <param name="newFileName">Optional override for the resulting file name.</param>
+    /// <returns>The resulting <see cref="FileAnalysis"/> after applying the diff.</returns>
     public static FileAnalysis ApplyFile(FileAnalysis oldFile, FileDiff fileDiff, string? newFileName = null)
     {
         if (oldFile == null) throw new ArgumentNullException(nameof(oldFile));
