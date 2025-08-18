@@ -36,14 +36,34 @@ internal class Program
 		}
 
 		Console.WriteLine($"Loading analysis JSON: {jsonPath}");
-		List<FileAnalysis>? analysis;
+  List<FileAnalysis>? analysis;
 		try
 		{
 			string json = File.ReadAllText(jsonPath);
-			analysis = JsonSerializer.Deserialize<List<FileAnalysis>>(json, new JsonSerializerOptions
+			// Support both new DirectoryAnalysis object and legacy List<FileAnalysis> formats.
+			DirectoryAnalysis? dirAnalysis = null;
+			try
 			{
-				PropertyNameCaseInsensitive = true
-			});
+				dirAnalysis = JsonSerializer.Deserialize<DirectoryAnalysis>(json, new JsonSerializerOptions
+				{
+					PropertyNameCaseInsensitive = true
+				});
+			}
+			catch
+			{
+				// ignore and try legacy format
+			}
+			if (dirAnalysis != null && dirAnalysis.Files != null && dirAnalysis.Files.Count > 0)
+			{
+				analysis = dirAnalysis.Files;
+			}
+			else
+			{
+				analysis = JsonSerializer.Deserialize<List<FileAnalysis>>(json, new JsonSerializerOptions
+				{
+					PropertyNameCaseInsensitive = true
+				});
+			}
 
 			if (analysis == null)
 			{

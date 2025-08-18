@@ -13,11 +13,11 @@ public class CodeAnalyzer
 /// <param name="directoryPath">The root directory to analyze.</param>
 /// <param name="ignorePatterns">Optional regex patterns (relative paths) to exclude.</param>
 /// <param name="fileExtensions">Optional file glob patterns (e.g., "*.cs"); defaults to C# files.</param>
-/// <returns>A list of <see cref="FileAnalysis"/> results, one per file.</returns>
-public async Task<List<FileAnalysis>> AnalyzeDirectoryAsync(string directoryPath,
+/// <returns>A <see cref="DirectoryAnalysis"/> containing all file analyses.</returns>
+public async Task<DirectoryAnalysis> AnalyzeDirectoryAsync(string directoryPath,
 		List<string>? ignorePatterns = null, List<string>? fileExtensions = null)
 	{
-		List<FileAnalysis> results = [];
+		DirectoryAnalysis dir = new DirectoryAnalysis { Directory = directoryPath };
 
 		// Default to C# files if no extensions specified
 		fileExtensions ??= new List<string> { "*.cs" };
@@ -36,10 +36,10 @@ public async Task<List<FileAnalysis>> AnalyzeDirectoryAsync(string directoryPath
 		{
 			string relativePath = Path.GetRelativePath(directoryPath, filePath);
 			FileAnalysis fileAnalysis = await this.AnalyzeFileAsync(filePath, relativePath);
-			results.Add(fileAnalysis);
+			dir.Files.Add(fileAnalysis);
 		}
 
-		return results;
+		return dir;
 	}
 
  /// <summary>

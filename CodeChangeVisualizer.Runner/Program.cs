@@ -144,15 +144,15 @@ public class Program
 			{
 				// Regular single analysis mode
 				CodeAnalyzer analyzer = new CodeAnalyzer();
-				List<FileAnalysis> results = await analyzer.AnalyzeDirectoryAsync(
+    DirectoryAnalysis dirAnalysis = await analyzer.AnalyzeDirectoryAsync(
 					config.Directory,
 					config.IgnorePatterns.Count > 0 ? config.IgnorePatterns : null,
 					config.FileExtensions.Count > 0 ? config.FileExtensions : null);
 
 				// Output JSON to console if requested
-				if (config.OutputToConsole)
+    if (config.OutputToConsole)
 				{
-					string jsonOutput = JsonSerializer.Serialize(results, new JsonSerializerOptions
+					string jsonOutput = JsonSerializer.Serialize(dirAnalysis, new JsonSerializerOptions
 					{
 						WriteIndented = true,
 						PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -161,9 +161,9 @@ public class Program
 				}
 
 				// Output JSON to file if requested
-				if (config.JsonOutput != null)
+    if (config.JsonOutput != null)
 				{
-					string jsonOutput = JsonSerializer.Serialize(results, new JsonSerializerOptions
+					string jsonOutput = JsonSerializer.Serialize(dirAnalysis, new JsonSerializerOptions
 					{
 						WriteIndented = true,
 						PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -175,9 +175,9 @@ public class Program
 				// Generate visualization if requested
 				if (config.VisualizationOutput != null)
 				{
-					CodeVisualizer visualizer = new CodeVisualizer();
-					visualizer.GenerateVisualization(results, config.VisualizationOutput);
-					Console.WriteLine($"Visualization saved to: {config.VisualizationOutput}");
+     CodeVisualizer visualizer = new CodeVisualizer();
+				visualizer.GenerateVisualization(dirAnalysis.Files, config.VisualizationOutput);
+				Console.WriteLine($"Visualization saved to: {config.VisualizationOutput}");
 				}
 			}
 		}
@@ -241,10 +241,11 @@ public class Program
 				await RunGitAsync($"checkout --quiet {sha}", workDir);
 
 				CodeAnalyzer analyzer = new CodeAnalyzer();
-				List<FileAnalysis> current = await analyzer.AnalyzeDirectoryAsync(
+    DirectoryAnalysis currentAll = await analyzer.AnalyzeDirectoryAsync(
 					workDir,
 					config.IgnorePatterns.Count > 0 ? config.IgnorePatterns : null,
 					config.FileExtensions.Count > 0 ? config.FileExtensions : null);
+				List<FileAnalysis> current = currentAll.Files;
 
 				if (prev == null)
 				{
