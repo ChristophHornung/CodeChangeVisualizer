@@ -38,6 +38,7 @@ internal class Program
 
 		Console.WriteLine($"Loading analysis JSON: {jsonPath}");
 		List<FileAnalysis>? analysis;
+		RevisionLog? revForPlayback = null;
 		try
 		{
 			string json = File.ReadAllText(jsonPath);
@@ -53,10 +54,11 @@ internal class Program
 			}
 			catch { /* ignore; try other formats */ }
 
-			if (revLog != null && revLog.Revisions != null && revLog.Revisions.Count > 0)
+			revForPlayback = revLog;
+			if (revForPlayback != null && revForPlayback.Revisions != null && revForPlayback.Revisions.Count > 0)
 			{
 				// Reconstruct the latest analysis by applying diffs across revisions
-				List<RevisionEntry> revs = revLog.Revisions;
+				List<RevisionEntry> revs = revForPlayback.Revisions;
 				if (revs[0].Analysis == null)
 				{
 					Console.WriteLine("Error: Revision log missing initial full analysis.");
@@ -162,6 +164,27 @@ internal class Program
 			Entity hoverEntity = new Entity("HoverTooltip");
 			hoverEntity.Add(new HoverTooltipScript());
 			rootScene.Entities.Add(hoverEntity);
+
+			// If we also have a revision log, attach diff playback with Space key
+			if (revForPlayback != null && revForPlayback.Revisions != null && revForPlayback.Revisions.Count > 0)
+			{
+				var diffs = revForPlayback.Revisions.Skip(1)
+					.Where(r => r.Diff != null && r.Diff.Count > 0)
+					.Select(r => r.Diff!)
+					.ToList();
+				if (diffs.Count > 0)
+				{
+					Entity diffEntity = new Entity("DiffPlayback");
+					DiffPlaybackScript script = new DiffPlaybackScript
+					{
+						InitialAnalysis = revForPlayback.Revisions[0].Analysis ?? analysis,
+						Diffs = diffs
+					};
+					diffEntity.Add(script);
+					rootScene.Entities.Add(diffEntity);
+					Console.WriteLine("Press SPACE to apply next diff (2s animation per step).");
+				}
+			}
 		});
 	}
 

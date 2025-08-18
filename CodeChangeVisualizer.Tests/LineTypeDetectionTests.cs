@@ -59,6 +59,7 @@ public class LineTypeDetectionTests
 	[InlineData("lock (obj)", LineType.ComplexityIncreasing)]
 	[InlineData("  if (condition)", LineType.ComplexityIncreasing)]
 	[InlineData("\tif (condition)", LineType.ComplexityIncreasing)]
+	[InlineData("for(", LineType.ComplexityIncreasing)]
 	public void ComplexityIncreasingLines_ShouldBeIdentifiedCorrectly(string line, LineType expectedType)
 	{
 		LineType result = this.AnalyzeSingleLine(line);
@@ -81,6 +82,14 @@ public class LineTypeDetectionTests
 	[InlineData("x = y + z;", LineType.Code)]
 	[InlineData("Method();", LineType.Code)]
 	[InlineData("obj.Property = value;", LineType.Code)]
+	// Inline block comments should not trigger CodeAndComment in current implementation
+	[InlineData("var x = 5; /* comment */", LineType.Code)]
+	// Code after block comment on same line is treated as pure comment due to StartsWith check
+	[InlineData("/* comment */ var x = 5;", LineType.Comment)]
+	// Line starting with block comment end is also treated as comment
+	[InlineData("*/ var x = 5;", LineType.Comment)]
+	// Triple-slash after code currently triggers CodeAndComment due to '//' detection
+	[InlineData("var x = 1; /// trailing doc", LineType.CodeAndComment)]
 	public void RegularCodeLines_ShouldBeIdentifiedCorrectly(string line, LineType expectedType)
 	{
 		LineType result = this.AnalyzeSingleLine(line);
@@ -112,6 +121,8 @@ public class LineTypeDetectionTests
 	[InlineData("continue; // Continue loop", LineType.ComplexityIncreasing)]
 	[InlineData("throw new Exception(); // Throw exception", LineType.ComplexityIncreasing)]
 	[InlineData("await Task.Delay(1000); // Wait", LineType.ComplexityIncreasing)]
+	// Inline block comment should not prevent complexity detection
+	[InlineData("return /* inline */ x;", LineType.ComplexityIncreasing)]
 	public void ComplexityIncreasingWithCommentLines_ShouldBeIdentifiedCorrectly(string line, LineType expectedType)
 	{
 		LineType result = this.AnalyzeSingleLine(line);
@@ -151,6 +162,9 @@ public class LineTypeDetectionTests
 	[InlineData("if(", LineType.ComplexityIncreasing)] // 'if(' should be detected
 	[InlineData("if ", LineType.ComplexityIncreasing)] // 'if ' should be detected
 	[InlineData("if\t", LineType.ComplexityIncreasing)] // 'if\t' should be detected
+	[InlineData("awaited", LineType.Code)] // identifier that starts with await should not match
+	[InlineData("foreaching", LineType.Code)] // identifier that starts with foreach should not match
+	[InlineData("switcheroo", LineType.Code)] // identifier that starts with switch should not match
 	public void KeywordDetection_ShouldBeAccurate(string line, LineType expectedType)
 	{
 		LineType result = this.AnalyzeSingleLine(line);
