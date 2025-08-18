@@ -74,7 +74,12 @@ internal class Program
 			visualizer.BuildScene(rootScene, analysis, game);
 
 			Console.WriteLine("Skyscraper visualization setup complete!");
-		});
+
+			// Add hover tooltip script
+			var hoverEntity = new Entity("HoverTooltip");
+			hoverEntity.Add(new HoverTooltipScript());
+			rootScene.Entities.Add(hoverEntity);
+			});
 	}
 
 	private static string? GetDefaultAnalysisJsonPath()
