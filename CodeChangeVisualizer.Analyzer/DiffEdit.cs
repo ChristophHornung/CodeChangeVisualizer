@@ -25,6 +25,7 @@ public record DiffEdit
 	/// For Resize/Remove, the original length (lines). For Insert, null.
 	/// </summary>
 	public int? OldLength { get; init; }
+
 	/// <summary>
 	/// For Resize/Insert, the new length (lines). For Remove, null.
 	/// </summary>

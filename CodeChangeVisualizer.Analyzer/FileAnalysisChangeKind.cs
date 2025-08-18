@@ -7,8 +7,10 @@ public enum FileAnalysisChangeKind
 {
 	/// <summary>The file content was modified with block edits.</summary>
 	Modify,
+
 	/// <summary>The file was added.</summary>
 	FileAdd,
+
 	/// <summary>The file was deleted.</summary>
 	FileDelete
 }

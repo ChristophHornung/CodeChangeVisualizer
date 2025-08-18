@@ -21,7 +21,7 @@ internal class Program
 		}
 		else
 		{
-			jsonPath = GetDefaultAnalysisJsonPath();
+			jsonPath = Program.GetDefaultAnalysisJsonPath();
 			if (jsonPath != null)
 			{
 				Console.WriteLine($"No parameter provided. Using default analysis JSON: {jsonPath}");
@@ -31,12 +31,13 @@ internal class Program
 		if (string.IsNullOrWhiteSpace(jsonPath) || !File.Exists(jsonPath))
 		{
 			Console.WriteLine("Usage: CodeChangeVisualizer.StrideRunner <analysis.json>");
-			Console.WriteLine("No valid analysis JSON found. Looked for a default at <solution>\\bin\\analysis.json (and common debug paths).");
+			Console.WriteLine(
+				"No valid analysis JSON found. Looked for a default at <solution>\\bin\\analysis.json (and common debug paths).");
 			return;
 		}
 
 		Console.WriteLine($"Loading analysis JSON: {jsonPath}");
-  List<FileAnalysis>? analysis;
+		List<FileAnalysis>? analysis;
 		try
 		{
 			string json = File.ReadAllText(jsonPath);
@@ -53,6 +54,7 @@ internal class Program
 			{
 				// ignore and try legacy format
 			}
+
 			if (dirAnalysis != null && dirAnalysis.Files != null && dirAnalysis.Files.Count > 0)
 			{
 				analysis = dirAnalysis.Files;
@@ -99,14 +101,16 @@ internal class Program
 			var hoverEntity = new Entity("HoverTooltip");
 			hoverEntity.Add(new HoverTooltipScript());
 			rootScene.Entities.Add(hoverEntity);
-			});
+		});
 	}
 
 	private static string? GetDefaultAnalysisJsonPath()
 	{
-		string? solutionRoot = FindSolutionRoot();
+		string? solutionRoot = Program.FindSolutionRoot();
 		if (string.IsNullOrEmpty(solutionRoot))
+		{
 			return null;
+		}
 
 		string[] candidates = new[]
 		{
@@ -118,7 +122,9 @@ internal class Program
 		foreach (var candidate in candidates)
 		{
 			if (File.Exists(candidate))
+			{
 				return candidate;
+			}
 		}
 
 		return null;
@@ -134,7 +140,9 @@ internal class Program
 			{
 				string slnx = Path.Combine(current.FullName, "CodeChangeVisualizer.slnx");
 				if (File.Exists(slnx))
+				{
 					return current.FullName;
+				}
 
 				current = current.Parent;
 			}
@@ -143,6 +151,7 @@ internal class Program
 		{
 			// ignore
 		}
+
 		return null;
 	}
 }

@@ -16,12 +16,12 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\CodeChangeVisualizer.Analyzer\CodeChangeVisualizer.Analyzer.csproj" />
+		<ProjectReference Include="..\CodeChangeVisualizer.Analyzer\CodeChangeVisualizer.Analyzer.csproj"/>
 	</ItemGroup>
 
 	<ItemGroup>
-		<Compile Remove="FileAnalysis.cs" />
-		<Compile Remove="LineGroup.cs" />
-		<Compile Remove="LineType.cs" />
+		<Compile Remove="FileAnalysis.cs"/>
+		<Compile Remove="LineGroup.cs"/>
+		<Compile Remove="LineType.cs"/>
 	</ItemGroup>
 </Project>
