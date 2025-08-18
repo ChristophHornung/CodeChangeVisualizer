@@ -17,7 +17,7 @@ public class Configuration
 	public bool OutputToConsole { get; set; }
 
 	[JsonPropertyName("ignorePatterns")]
-	public List<string> IgnorePatterns { get; set; } = new();
+	public List<string> IgnorePatterns { get; set; } = new() { "/bin", "/obj" };
 
 	[JsonPropertyName("fileExtensions")]
 	public List<string> FileExtensions { get; set; } = new() { "*.cs" };

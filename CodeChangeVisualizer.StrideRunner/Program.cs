@@ -41,30 +41,91 @@ internal class Program
 		try
 		{
 			string json = File.ReadAllText(jsonPath);
-			// Support both new DirectoryAnalysis object and legacy List<FileAnalysis> formats.
+			// Support RevisionLog (advanced mode), DirectoryAnalysis (new), and legacy List<FileAnalysis> formats.
+			RevisionLog? revLog = null;
 			DirectoryAnalysis? dirAnalysis = null;
 			try
 			{
-				dirAnalysis = JsonSerializer.Deserialize<DirectoryAnalysis>(json, new JsonSerializerOptions
+				revLog = JsonSerializer.Deserialize<RevisionLog>(json, new JsonSerializerOptions
 				{
 					PropertyNameCaseInsensitive = true
 				});
 			}
-			catch
-			{
-				// ignore and try legacy format
-			}
+			catch { /* ignore; try other formats */ }
 
-			if (dirAnalysis != null && dirAnalysis.Files != null && dirAnalysis.Files.Count > 0)
+			if (revLog != null && revLog.Revisions != null && revLog.Revisions.Count > 0)
 			{
-				analysis = dirAnalysis.Files;
+				// Reconstruct the latest analysis by applying diffs across revisions
+				List<RevisionEntry> revs = revLog.Revisions;
+				if (revs[0].Analysis == null)
+				{
+					Console.WriteLine("Error: Revision log missing initial full analysis.");
+					return;
+				}
+				Dictionary<string, FileAnalysis> files = revs[0].Analysis.ToDictionary(f => f.File, f => f);
+				for (int i = 1; i < revs.Count; i++)
+				{
+					RevisionEntry entry = revs[i];
+					if (entry.Diff == null) continue;
+					foreach (FileChangeEntry change in entry.Diff)
+					{
+						string file = change.File;
+						FileAnalysisDiff fad = change.Change;
+						switch (fad.Kind)
+						{
+							case FileAnalysisChangeKind.FileAdd:
+							{
+								List<LineGroup> lines = (fad.NewFileLines ?? new List<LineGroup>())
+									.Select(g => new LineGroup { Type = g.Type, Length = g.Length, Start = g.Start })
+									.ToList();
+								// Recompute Start
+								int s = 0; foreach (var lg in lines) { lg.Start = s; s += lg.Length; }
+								files[file] = new FileAnalysis { File = file, Lines = lines };
+								break;
+							}
+							case FileAnalysisChangeKind.FileDelete:
+							{
+								files.Remove(file);
+								break;
+							}
+							case FileAnalysisChangeKind.Modify:
+							default:
+							{
+								if (!files.TryGetValue(file, out FileAnalysis? oldFa))
+								{
+									oldFa = new FileAnalysis { File = file, Lines = new List<LineGroup>() };
+								}
+								FileAnalysis patched = FileAnalysisApplier.Apply(oldFa, fad, file);
+								files[file] = patched;
+								break;
+ 						}
+						}
+					} // end foreach file change
+				} // end for each revision
+				analysis = files.Values.OrderBy(f => f.File, StringComparer.OrdinalIgnoreCase).ToList();
 			}
 			else
 			{
-				analysis = JsonSerializer.Deserialize<List<FileAnalysis>>(json, new JsonSerializerOptions
+				try
 				{
-					PropertyNameCaseInsensitive = true
-				});
+					dirAnalysis = JsonSerializer.Deserialize<DirectoryAnalysis>(json, new JsonSerializerOptions
+					{
+						PropertyNameCaseInsensitive = true
+					});
+				}
+				catch { /* ignore */ }
+
+				if (dirAnalysis != null && dirAnalysis.Files != null && dirAnalysis.Files.Count > 0)
+				{
+					analysis = dirAnalysis.Files;
+				}
+				else
+				{
+					analysis = JsonSerializer.Deserialize<List<FileAnalysis>>(json, new JsonSerializerOptions
+					{
+						PropertyNameCaseInsensitive = true
+					});
+				}
 			}
 
 			if (analysis == null)
