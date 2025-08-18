@@ -8,6 +8,8 @@ using Stride.Engine;
 using Stride.Rendering;
 using Stride.Rendering.Materials;
 using Stride.Rendering.Materials.ComputeColors;
+using System.Linq;
+using Stride.Graphics;
 
 /// <summary>
 /// Builds a Stride Scene representing the analysis as a set of "skyscraper" towers.
@@ -40,6 +42,9 @@ public class SkyscraperVisualizer
 
 		this.BuildTowers(scene, analysis, game);
 
+		// After building, frame the camera so all skyscrapers are visible
+		this.FrameCameraToFit(scene, game, analysis);
+
 		Console.WriteLine("Skyscraper visualization complete!");
 	}
 
@@ -71,6 +76,115 @@ public class SkyscraperVisualizer
 
 			index++;
 		}
+	}
+
+	/// <summary>
+	/// Positions the default camera so that all towers are within view.
+	/// </summary>
+	private void FrameCameraToFit(Scene scene, Game game, List<FileAnalysis> analysis)
+	{
+		int count = analysis.Count;
+		if (count == 0)
+		{
+			return;
+		}
+
+		int gridSize = (int)Math.Ceiling(Math.Sqrt(count));
+		int rows = (int)Math.Ceiling((float)count / gridSize);
+		int cols = Math.Min(gridSize, count);
+
+		float width = (cols - 1) * SkyscraperVisualizer.TowerSpacing;
+		float depth = (rows - 1) * SkyscraperVisualizer.TowerSpacing;
+		float maxHeight = analysis.Select(f => (f.Lines?.Sum(g => g.Length) ?? 0) * SkyscraperVisualizer.UnitsPerLine).DefaultIfEmpty(0f).Max();
+
+		Console.WriteLine($"[CameraFit] count={count} gridSize={gridSize} rows={rows} cols={cols} width={width:F2} depth={depth:F2} maxHeight={maxHeight:F2}");
+
+		// Find a camera in the scene (search recursively)
+		CameraComponent? camera = SkyscraperVisualizer.FindCamera(scene);
+		if (camera == null)
+		{
+			Console.WriteLine("[CameraFit] No camera found in scene.");
+			return;
+		}
+		Console.WriteLine($"[CameraFit] Using camera entity: {camera.Entity?.Name}");
+
+		// Compute center of bounds
+		Vector3 center = new Vector3(width / 2f, Math.Max(0.5f, maxHeight / 2f), depth / 2f);
+		// Bounding sphere radius (half-diagonal of the box)
+		float radius = 0.5f * (float)Math.Sqrt(width * width + depth * depth + maxHeight * maxHeight);
+		float vfov = camera.VerticalFieldOfView;
+		if (vfov <= 0f)
+		{
+			vfov = MathUtil.DegreesToRadians(60f);
+		}
+
+		Texture? backBuffer = game.GraphicsDevice?.Presenter?.BackBuffer;
+		float aspect = (backBuffer != null && backBuffer.Height > 0) ? (float)backBuffer.Width / backBuffer.Height : (16f / 9f);
+		float hfov = 2f * (float)Math.Atan(Math.Tan(vfov / 2f) * aspect);
+		float limitingFov = Math.Min(vfov, hfov);
+		Console.WriteLine($"[CameraFit] aspect={aspect:F3} vfovDeg={MathUtil.RadiansToDegrees(vfov):F1} hfovDeg={MathUtil.RadiansToDegrees(hfov):F1} limitingFovDeg={MathUtil.RadiansToDegrees(limitingFov):F1}");
+
+		// Distance to fit the sphere inside frustum using limiting FOV; add a margin
+		float distance = radius / (float)Math.Sin(Math.Max(0.1f, limitingFov / 2f));
+		float margin = 1.25f;
+		distance *= margin;
+		Console.WriteLine($"[CameraFit] radius={radius:F2} distance={distance:F2}");
+
+		// Choose a 45° elevated diagonal viewing direction (45° azimuth and 45° elevation)
+		// We want the camera to be ABOVE the scene, looking DOWN toward the center.
+		// Therefore, the direction from camera to center must have a NEGATIVE Y component.
+		// Rotate azimuth by 180° (flip X/Z) to face the city while keeping 45° elevation downward.
+		Vector3 dir = Vector3.Normalize(new Vector3(1f, -(float)Math.Sqrt(2), 1f));
+		Vector3 position = center - dir * distance;
+		Console.WriteLine($"[CameraFit] dir=({dir.X:F3},{dir.Y:F3},{dir.Z:F3}) position=({position.X:F2},{position.Y:F2},{position.Z:F2}) center=({center.X:F2},{center.Y:F2},{center.Z:F2})");
+
+		Entity camEntity = camera.Entity;
+		camEntity.Transform.Position = position;
+
+		// Orient camera to look at center
+		Vector3 fwd = Vector3.Normalize(center - position);
+		float yaw = (float)Math.Atan2(fwd.X, fwd.Z);
+		float pitch = (float)Math.Asin(fwd.Y);
+		// Apply a 180° yaw flip to ensure the city is in front, and force a downward pitch.
+		float appliedYaw = yaw + MathUtil.Pi;
+		float appliedPitch = -Math.Abs(pitch);
+		camEntity.Transform.Rotation = Quaternion.RotationYawPitchRoll(appliedYaw, appliedPitch, 0f);
+		Console.WriteLine($"[CameraFit] yawDeg={MathUtil.RadiansToDegrees(appliedYaw):F1} pitchDeg={MathUtil.RadiansToDegrees(appliedPitch):F1} (applied, yaw+180, downward pitch)");
+	}
+
+	private static CameraComponent? FindCamera(Scene scene)
+	{
+		// Search all entities recursively for a CameraComponent
+		foreach (var root in scene.Entities)
+		{
+			var cam = FindCameraRecursive(root);
+			if (cam != null)
+			{
+				return cam;
+			}
+		}
+		return null;
+	}
+
+	private static CameraComponent? FindCameraRecursive(Entity entity)
+	{
+		var cam = entity.Get<CameraComponent>();
+		if (cam != null)
+		{
+			return cam;
+		}
+		foreach (var child in entity.Transform.Children)
+		{
+			if (child.Entity != null)
+			{
+				var found = FindCameraRecursive(child.Entity);
+				if (found != null)
+				{
+					return found;
+				}
+			}
+		}
+		return null;
 	}
 
 	/// <summary>
