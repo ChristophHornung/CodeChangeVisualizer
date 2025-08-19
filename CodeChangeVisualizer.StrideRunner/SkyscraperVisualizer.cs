@@ -10,6 +10,7 @@ using Stride.Rendering.Materials;
 using Stride.Rendering.Materials.ComputeColors;
 using System.Linq;
 using Stride.Graphics;
+using System.Collections.Generic;
 
 /// <summary>
 /// Builds a Stride Scene representing the analysis as a set of "skyscraper" towers.
@@ -32,6 +33,32 @@ public class SkyscraperVisualizer
 		[LineType.Code] = new Color4(0.5f, 0.5f, 0.5f, 1f), // Gray
 		[LineType.CodeAndComment] = new Color4(0.56f, 0.93f, 0.56f, 1f) // LightGreen
 	};
+
+ // Cache one material per unique RGBA color to avoid creating thousands of identical materials
+	private static readonly Dictionary<int, Material> MaterialCache = new();
+
+	private static Material GetOrCreateSolidColorMaterial(Game game, Color4 color)
+	{
+		int key = color.ToRgba();
+		if (MaterialCache.TryGetValue(key, out var cached))
+		{
+			return cached;
+		}
+
+		var materialDesc = new MaterialDescriptor
+		{
+			Attributes = new MaterialAttributes
+			{
+				Diffuse = new MaterialDiffuseMapFeature(new ComputeColor(color)),
+				DiffuseModel = new MaterialDiffuseLambertModelFeature(),
+				// Emissive = new MaterialEmissiveMapFeature(new ComputeColor(color))
+			}
+		};
+
+		var material = Material.New(game.GraphicsDevice, materialDesc);
+		MaterialCache[key] = material;
+		return material;
+	}
 
 	/// <summary>
 	/// Builds skyscrapers in an existing scene using Community Toolkit primitives.
@@ -260,24 +287,8 @@ public class SkyscraperVisualizer
 			return; // Nothing to color
 		}
 
-		// Note on lighting and perceived black colors:
-		// Stride uses a PBR (physically based) lighting model. A Diffuse/Albedo color does not emit light by itself;
-		// it only reflects incoming light. If the scene lacks sufficient light (e.g., no/weak lights, grazing angles,
-		// low exposure/tonemapping), purely diffuse objects can look very dark or even black. Adding an Emissive
-		// feature makes the material self-lit so the intended color is visible regardless of lighting conditions.
-		// For production, prefer fixing lighting (directional/ambient intensity and orientation) and exposure,
-		// then reduce/remove Emissive once the scene is properly lit.
-		MaterialDescriptor materialDesc = new()
-		{
-			Attributes = new MaterialAttributes
-			{
-				Diffuse = new MaterialDiffuseMapFeature(new ComputeColor(color)),
-				DiffuseModel = new MaterialDiffuseLambertModelFeature(),
-				// Emissive = new MaterialEmissiveMapFeature(new ComputeColor(color))
-			}
-		};
-
-		Material? material = Material.New(game.GraphicsDevice, materialDesc);
+		// Use a cached material for this color to reduce allocations and state changes
+		Material material = GetOrCreateSolidColorMaterial(game, color);
 
 		if (modelComponent.Model != null)
 		{
