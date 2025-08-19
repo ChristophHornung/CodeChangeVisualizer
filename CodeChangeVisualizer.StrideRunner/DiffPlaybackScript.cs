@@ -484,6 +484,9 @@ public class DiffPlaybackScript : SyncScript
 		}
 		cube.Transform.Position = new Vector3(0f, currentY + height / 2f, 0f);
 		cube.Add(new BlockDescriptorComponent { Size = new Vector3(DiffPlaybackScript.BlockWidth, height, DiffPlaybackScript.BlockDepth), Color = color });
+
+		// Ensure per-entity material override so colors don't bleed across shared model instances
+		this.ApplyColorToCube(cube, color);
 		return cube;
 	}
 
@@ -499,10 +502,15 @@ public class DiffPlaybackScript : SyncScript
 		desc.Size = new Vector3(DiffPlaybackScript.BlockWidth, Math.Max(0f, currentHeight), DiffPlaybackScript.BlockDepth);
 	}
 
-	private void ApplyColorToCube(Game game, Entity cube, Color4 color)
+	private void ApplyColorToCube(Entity cube, Color4 color)
 	{
 		ModelComponent? modelComponent = cube.Get<ModelComponent>();
 		if (modelComponent == null)
+		{
+			return;
+		}
+		var game = this.Game as Game;
+		if (game?.GraphicsDevice == null)
 		{
 			return;
 		}
@@ -515,16 +523,16 @@ public class DiffPlaybackScript : SyncScript
 			}
 		};
 		Material? material = Material.New(game.GraphicsDevice, materialDesc);
-		if (modelComponent.Model != null)
+
+		// Assign per-entity material override (do not touch the shared Model's materials)
+		var materials = modelComponent.Materials;
+		if (materials.Count > 0)
 		{
-			if (modelComponent.Model.Materials.Count > 0)
-			{
-				modelComponent.Model.Materials[0] = material;
-			}
-			else
-			{
-				modelComponent.Model.Materials.Add(material);
-			}
+			materials[0] = material;
+		}
+		else
+		{
+			materials.Add(new KeyValuePair<int, Material>(0, material));
 		}
 	}
 }

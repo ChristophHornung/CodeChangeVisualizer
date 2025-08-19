@@ -34,8 +34,22 @@ public class SkyscraperVisualizer
 		[LineType.CodeAndComment] = new Color4(0.56f, 0.93f, 0.56f, 1f) // LightGreen
 	};
 
- // Cache one material per unique RGBA color to avoid creating thousands of identical materials
+	// Cache one material per unique RGBA color to avoid creating thousands of identical materials
 	private static readonly Dictionary<int, Material> MaterialCache = new();
+
+	// Reuse a single unit-cube model for all blocks to avoid creating thousands of meshes
+	private static Model? s_UnitCubeModel;
+
+	private static void EnsureUnitCubeModel(Game game)
+	{
+		if (s_UnitCubeModel != null) return;
+		// Create a 1x1x1 cube once and reuse its Model
+		var createOptions = new Primitive3DCreationOptions { Size = new Vector3(1f, 1f, 1f), IncludeCollider = false };
+		Entity temp = game.Create3DPrimitive(PrimitiveModelType.Cube, createOptions);
+		var modelComp = temp.Get<ModelComponent>();
+		s_UnitCubeModel = modelComp?.Model;
+		// We don't add temp to the scene; it will be GC'ed. We only keep the Model reference.
+	}
 
 	private static Material GetOrCreateSolidColorMaterial(Game game, Color4 color)
 	{
@@ -227,8 +241,9 @@ public class SkyscraperVisualizer
 	/// <summary>
 	/// Builds all blocks for a single tower.
 	/// </summary>
-	private void BuildTowerBlocks(FileAnalysis file, Entity fileRoot, Game game)
+ private void BuildTowerBlocks(FileAnalysis file, Entity fileRoot, Game game)
 	{
+		SkyscraperVisualizer.EnsureUnitCubeModel(game);
 		float currentY = 0f;
 		Console.WriteLine($"Building tower for file: {fileRoot.Name}");
 
@@ -246,26 +261,24 @@ public class SkyscraperVisualizer
 	/// <summary>
 	/// Creates a single block for a line group.
 	/// </summary>
-	private Entity CreateBlock(FileAnalysis file, LineGroup group, float currentY, Game game)
+ private Entity CreateBlock(FileAnalysis file, LineGroup group, float currentY, Game game)
 	{
 		float height = group.Length * SkyscraperVisualizer.UnitsPerLine;
 		Color4 color = SkyscraperVisualizer.LineTypeColors[group.Type];
 
-		// Create a cube using Community Toolkit primitives with size options
-		Primitive3DCreationOptions createOptions = new Primitive3DCreationOptions
+		// Create an entity that reuses a shared unit-cube model and scale it to desired size
+		Entity cube = new Entity($"{file.File} [{group.Start}-{group.Start + group.Length - 1}] {group.Type}");
+		if (s_UnitCubeModel != null)
 		{
-			Size = new Vector3(SkyscraperVisualizer.BlockWidth, height, SkyscraperVisualizer.BlockDepth),
-			IncludeCollider = false
-		};
-
-		Entity cube = game.Create3DPrimitive(PrimitiveModelType.Cube, createOptions);
-		cube.Name = $"{file.File} [{group.Start}-{group.Start + group.Length - 1}] {group.Type}";
+			cube.Add(new ModelComponent { Model = s_UnitCubeModel });
+		}
 		cube.Transform.Position = new Vector3(0f, currentY + height / 2, 0f);
+		cube.Transform.Scale = new Vector3(SkyscraperVisualizer.BlockWidth, height, SkyscraperVisualizer.BlockDepth);
 
 		// Apply material color directly so it renders with the intended color
 		this.ApplyColorToCube(game, cube, color);
 
-		// Attach color metadata component so renderers can use it
+		// Attach color metadata component so renderers can use it (also used for picking)
 		cube.Add(new BlockDescriptorComponent
 		{
 			Size = new Vector3(SkyscraperVisualizer.BlockWidth, height, SkyscraperVisualizer.BlockDepth), Color = color
@@ -290,16 +303,15 @@ public class SkyscraperVisualizer
 		// Use a cached material for this color to reduce allocations and state changes
 		Material material = GetOrCreateSolidColorMaterial(game, color);
 
-		if (modelComponent.Model != null)
+		// IMPORTANT: assign per-entity override, not the shared Model's materials
+		var materials = modelComponent.Materials;
+		if (materials.Count > 0)
 		{
-			if (modelComponent.Model.Materials.Count > 0)
-			{
-				modelComponent.Model.Materials[0] = material;
-			}
-			else
-			{
-				modelComponent.Model.Materials.Add(material);
-			}
+			materials[0] = material;
+		}
+		else
+		{
+			materials.Add(new KeyValuePair<int, Material>(0, material));
 		}
 	}
 }
