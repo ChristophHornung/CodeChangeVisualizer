@@ -11,11 +11,17 @@ using Stride.Core.Mathematics;
 public sealed class GridCityPlanner : ICityPlanner
 {
 	private const float TowerSpacing = LayoutCalculator.Constants.TowerSpacing;
+	private IReadOnlyList<FileAnalysis>? _files;
 
-	public Vector3 GetPosition(int index, IReadOnlyList<FileAnalysis> files)
+	public void SetFiles(IReadOnlyList<FileAnalysis> files)
+	{
+		this._files = files;
+	}
+
+	public Vector3 GetPosition(int index)
 	{
 		if (index < 0) index = 0;
-		int totalCount = files?.Count ?? (index + 1);
+		int totalCount = this._files?.Count ?? (index + 1);
 		if (totalCount < 1) totalCount = index + 1;
 		int gridSize = (int)System.Math.Ceiling(System.Math.Sqrt(totalCount));
 		int row = index / gridSize;
@@ -25,9 +31,9 @@ public sealed class GridCityPlanner : ICityPlanner
 		return new Vector3(x, 0f, z);
 	}
 
-	public (int rows, int cols, int gridSize) GetGrid(IReadOnlyList<FileAnalysis> files)
+	public (int rows, int cols, int gridSize) GetGrid()
 	{
-		int totalCount = files?.Count ?? 0;
+		int totalCount = this._files?.Count ?? 0;
 		if (totalCount <= 0)
 		{
 			return (0, 0, 0);

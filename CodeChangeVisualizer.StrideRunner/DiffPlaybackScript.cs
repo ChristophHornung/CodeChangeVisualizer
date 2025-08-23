@@ -320,10 +320,11 @@ public class DiffPlaybackScript : SyncScript
 
 		// Rebuild the towers using the same layout logic as creation via the planner
 		int total = this.InitialAnalysis.Count;
+		this._planner.SetFiles(this.InitialAnalysis);
 		for (int index = 0; index < total; index++)
 		{
 			var file = this.InitialAnalysis[index];
-			Vector3 pos = this._planner.GetPosition(index, this.InitialAnalysis);
+			Vector3 pos = this._planner.GetPosition(index);
 			Entity fileRoot = new Entity(file.File);
 			fileRoot.Transform.Position = new Vector3(pos.X, 0f, pos.Z);
 			rootEntities?.Add(fileRoot);
@@ -632,7 +633,8 @@ public class DiffPlaybackScript : SyncScript
  		// If we have a target analysis for this file in the current step, prefer that; otherwise, create a stub.
  		filesList.Add(new FileAnalysis { File = file, Lines = new List<LineGroup>() });
  	}
- 	Vector3 pos = this._planner.GetPosition(index, filesList);
+ 	this._planner.SetFiles(filesList);
+ 	Vector3 pos = this._planner.GetPosition(index);
  	Entity fileRoot = new Entity(file);
  	fileRoot.Transform.Position = new Vector3(pos.X, 0f, pos.Z);
  	return fileRoot;

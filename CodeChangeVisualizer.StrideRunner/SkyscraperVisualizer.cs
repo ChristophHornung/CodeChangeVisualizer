@@ -144,10 +144,11 @@ public class SkyscraperVisualizer
 		}
 		
 		ICityPlanner planner = new GridCityPlanner();
+		planner.SetFiles(analysis);
 		int index = 0;
 		foreach (FileAnalysis file in analysis)
 		{
-			Vector3 pos = planner.GetPosition(index, analysis);
+			Vector3 pos = planner.GetPosition(index);
 			Entity fileRoot = this.CreateTowerRoot(file, pos.X, pos.Z);
 			scene.Entities.Add(fileRoot);
 			
@@ -169,7 +170,8 @@ public class SkyscraperVisualizer
 		}
 		
 		ICityPlanner planner = new GridCityPlanner();
-		var (rows, cols, gridSize) = planner.GetGrid(analysis);
+		planner.SetFiles(analysis);
+		var (rows, cols, gridSize) = planner.GetGrid();
 		
 		float width = (cols - 1) * SkyscraperVisualizer.TowerSpacing;
 		float depth = (rows - 1) * SkyscraperVisualizer.TowerSpacing;
