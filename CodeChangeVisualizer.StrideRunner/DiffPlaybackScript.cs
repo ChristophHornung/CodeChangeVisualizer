@@ -195,7 +195,7 @@ public class DiffPlaybackScript : SyncScript
 					}
 				}
 
-				// Normalize new sequence blocks to have scale 1 and BaseSize equal to EndHeight
+				// Normalize new sequence blocks to have absolute scale matching final size
 				foreach (BlockAnim b in tower.NewSequence)
 				{
 					if (b.Entity == null) continue;
@@ -203,14 +203,9 @@ public class DiffPlaybackScript : SyncScript
 					if (desc != null)
 					{
 						desc.Size = new Vector3(DiffPlaybackScript.BlockWidth, b.EndHeight, DiffPlaybackScript.BlockDepth);
-						// Update base to match end height; reset scale to 1
-						if (desc is { })
-						{
-							// We will use BaseSize if present, but keep compatibility
-						}
 					}
-					// Reset local scale to 1 (since we encoded end height in desc.Size)
-					b.Entity.Transform.Scale = new Vector3(1f, 1f, 1f);
+					// Set absolute transform scale to match final block size (consistent with SkyscraperVisualizer)
+					b.Entity.Transform.Scale = new Vector3(DiffPlaybackScript.BlockWidth, b.EndHeight, DiffPlaybackScript.BlockDepth);
 				}
 
 				// Update current analysis
@@ -553,11 +548,11 @@ public class DiffPlaybackScript : SyncScript
 		BlockDescriptorComponent? desc = block.Get<BlockDescriptorComponent>();
 		if (desc == null) return;
 
-		float baseH = baseHeightOverride ?? desc.Size.Y;
-		float scaleY = baseH <= 0.0001f ? 0f : (currentHeight / baseH);
-		block.Transform.Scale = new Vector3(1f, Math.Max(0f, scaleY), 1f);
-		// Update descriptor Size to match current world size for hover picking
-		desc.Size = new Vector3(DiffPlaybackScript.BlockWidth, Math.Max(0f, currentHeight), DiffPlaybackScript.BlockDepth);
+		// Use absolute scaling so it matches SkyscraperVisualizer and avoids X/Z scale loss.
+		float clampedH = Math.Max(0f, currentHeight);
+		block.Transform.Scale = new Vector3(DiffPlaybackScript.BlockWidth, clampedH, DiffPlaybackScript.BlockDepth);
+		// Keep descriptor Size in sync with the actual world size for picking/metadata
+		desc.Size = new Vector3(DiffPlaybackScript.BlockWidth, clampedH, DiffPlaybackScript.BlockDepth);
 	}
 
 	private void ApplyColorToCube(Entity cube, Color4 color)
