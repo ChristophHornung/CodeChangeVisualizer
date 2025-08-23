@@ -530,7 +530,7 @@ public class DiffPlaybackScript : SyncScript
 			}
 		}
 
-		Entity cube = new Entity($"{file} [{group.Start}-{group.Start + group.Length - 1}] {group.Type}");
+		Entity cube = new Entity(file);
 		if (this._templateModel != null)
 		{
 			cube.Add(new ModelComponent { Model = this._templateModel });

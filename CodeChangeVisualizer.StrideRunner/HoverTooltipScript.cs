@@ -135,9 +135,19 @@ public class HoverTooltipScript : SyncScript
 
 		if (closestBlock != null)
 		{
-			// The tower root is the parent of the block; its Name is the file name/path
-			Entity? towerRoot = closestBlock.GetParent();
+			// Resolve the tower root by walking up the parents; fall back to block's own entity if necessary
+			Entity? towerRoot = closestBlock;
+			while (towerRoot?.GetParent() != null)
+			{
+				towerRoot = towerRoot.GetParent();
+			}
 			string fileName = towerRoot?.Name ?? closestBlock.Name;
+			// As a safety, strip any line-range suffix like " [start-end] ..." if present
+			int idx = fileName.IndexOf(" [");
+			if (idx >= 0)
+			{
+				fileName = fileName.Substring(0, idx);
+			}
 
 			// Compute the world hit position and project to screen space (normalized 0..1, top-left origin)
 			Vector3 hitPoint = rayOrigin + rayDir * closestT;

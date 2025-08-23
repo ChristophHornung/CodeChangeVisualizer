@@ -267,7 +267,7 @@ public class SkyscraperVisualizer
 		Color4 color = SkyscraperVisualizer.LineTypeColors[group.Type];
 
 		// Create an entity that reuses a shared unit-cube model and scale it to desired size
-		Entity cube = new Entity($"{file.File} [{group.Start}-{group.Start + group.Length - 1}] {group.Type}");
+		Entity cube = new Entity(file.File);
 		if (s_UnitCubeModel != null)
 		{
 			cube.Add(new ModelComponent { Model = s_UnitCubeModel });
