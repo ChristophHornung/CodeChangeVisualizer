@@ -4,6 +4,7 @@ using CodeChangeVisualizer.Analyzer;
 using System.Linq;
 using Stride.CommunityToolkit.Engine;
 using Stride.CommunityToolkit.Rendering.ProceduralModels;
+using Stride.CommunityToolkit.Bepu;
 using Stride.Core.Mathematics;
 using Stride.Engine;
 using Stride.Input;
@@ -540,28 +541,53 @@ public class DiffPlaybackScript : SyncScript
 
 	private Model? _templateModel;
 
+	private void EnsureTemplateModel()
+	{
+		if (this._templateModel != null)
+		{
+			return;
+		}
+
+		// First, try to capture a model from any existing block in the scene
+		var all = this.SceneSystem.SceneInstance?.RootScene.Entities;
+		if (all != null)
+		{
+			foreach (var e in all)
+			{
+				var modelComp = e.Get<ModelComponent>();
+				if (modelComp != null && modelComp.Model != null && e.Get<BlockDescriptorComponent>() != null)
+				{
+					this._templateModel = modelComp.Model;
+					break;
+				}
+			}
+		}
+
+		// If still null, synthesize a 1x1x1 cube model procedurally and keep its Model
+		if (this._templateModel == null)
+		{
+			var game = this.Game as Game;
+			if (game != null)
+			{
+				var createOptions = new Primitive3DCreationOptions { Size = new Vector3(1f, 1f, 1f), IncludeCollider = false };
+				Entity temp = game.Create3DPrimitive(PrimitiveModelType.Cube, createOptions);
+				var modelComp = temp.Get<ModelComponent>();
+				if (modelComp != null)
+				{
+					this._templateModel = modelComp.Model;
+				}
+				// We don't add 'temp' to the scene; it will be GC'ed. We only need the shared Model
+			}
+		}
+	}
+
 	private Entity CreateBlock(string file, LineGroup group, float currentY)
 	{
 		float height = group.Length * DiffPlaybackScript.UnitsPerLine;
 		Color4 color = DiffPlaybackScript.LineTypeColors[group.Type];
 
-		// Try to capture a template model from any existing block once
-		if (this._templateModel == null)
-		{
-			var all = this.SceneSystem.SceneInstance?.RootScene.Entities;
-			if (all != null)
-			{
-				foreach (var e in all)
-				{
-					var modelComp = e.Get<ModelComponent>();
-					if (modelComp != null && modelComp.Model != null && e.Get<BlockDescriptorComponent>() != null)
-					{
-						this._templateModel = modelComp.Model;
-						break;
-					}
-				}
-			}
-		}
+		// Ensure we have a template model to attach to new blocks, even if scene started empty
+		this.EnsureTemplateModel();
 
 		Entity cube = new Entity(file);
 		if (this._templateModel != null)
