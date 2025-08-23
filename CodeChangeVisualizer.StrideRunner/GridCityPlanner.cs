@@ -45,11 +45,26 @@ public sealed class GridCityPlanner : ICityPlanner
 			string file = files[i].File;
 			if (!this._positionByFile.TryGetValue(file, out Vector3 pos))
 			{
-				// Assign a new slot index at the end (append) and compute its position using fixed columns
+				// Assign a new slot index at the end (append) and compute its position using a square-layer growth pattern.
+				// This expands the grid in both X (cols) and Z (rows) without moving previously assigned towers.
 				int slot = this._assignedIndexByFile.Count;
 				this._assignedIndexByFile[file] = slot;
-				int col = (this._fixedCols > 0) ? (slot % this._fixedCols) : slot; // if cols not set, fall back to row=0
-				int row = (this._fixedCols > 0) ? (slot / this._fixedCols) : 0;
+				int k = System.Math.Max(1, (int)System.Math.Ceiling(System.Math.Sqrt(slot + 1))); // current square size
+				int prevSquare = (k - 1) * (k - 1);
+				int indexWithinLayer = slot - prevSquare;
+				int row, col;
+				if (indexWithinLayer < k)
+				{
+					// Fill the new rightmost column from top to bottom
+					row = indexWithinLayer;
+					col = k - 1;
+				}
+				else
+				{
+					// Then fill the new bottom row from left to right (excluding the overlapping corner)
+					row = k - 1;
+					col = indexWithinLayer - k;
+				}
 				pos = new Vector3(col * GridCityPlanner.TowerSpacing, 0f, row * GridCityPlanner.TowerSpacing);
 				this._positionByFile[file] = pos;
 			}
@@ -74,9 +89,11 @@ public sealed class GridCityPlanner : ICityPlanner
 		{
 			return (0, 0, 0);
 		}
-		int cols = (this._fixedCols > 0) ? System.Math.Min(this._fixedCols, totalCount) : System.Math.Max(1, (int)System.Math.Ceiling(System.Math.Sqrt(totalCount)));
-		int rows = (int)System.Math.Ceiling((float)totalCount / cols);
-		int gridSize = System.Math.Max(cols, rows);
+		// Report a square bound that encloses all assigned positions without moving existing towers.
+		int k = System.Math.Max(1, (int)System.Math.Ceiling(System.Math.Sqrt(totalCount)));
+		int rows = k;
+		int cols = k;
+		int gridSize = k;
 		return (rows, cols, gridSize);
 	}
 
