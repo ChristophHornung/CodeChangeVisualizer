@@ -1,8 +1,5 @@
 ﻿namespace CodeChangeVisualizer.StrideRunner;
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using CodeChangeVisualizer.Analyzer;
 using Stride.Core.Mathematics;
 
@@ -13,29 +10,6 @@ using Stride.Core.Mathematics;
 /// </summary>
 public static class LayoutCalculator
 {
-	public static class Constants
-	{
-		public const float UnitsPerLine = 0.02f; // 50 lines per unit
-		public const float TowerSpacing = 3.0f;
-		public const float BlockWidth = 1.0f;
-		public const float BlockDepth = 1.0f;
-	}
-
-	public sealed record BlockLayout(
-		int Index,
-		LineType LineType,
-		float Height,
-		Vector3 Size,
-		Vector3 CenterPosition
-	);
-
-	public sealed record TowerLayout(
-		string File,
-		int GridIndex,
-		Vector3 Position,
-		IReadOnlyList<BlockLayout> Blocks
-	);
-
 	/// <summary>
 	/// Computes the grid (x,z) position for a given tower index using the same
 	/// algorithm as the visualizer: square grid packing with spacing.
@@ -67,6 +41,7 @@ public static class LayoutCalculator
 			blocks.Add(new BlockLayout(i, group.Type, height, size, center));
 			currentY += height;
 		}
+
 		return blocks;
 	}
 
@@ -79,11 +54,35 @@ public static class LayoutCalculator
 		for (int index = 0; index < analysis.Count; index++)
 		{
 			FileAnalysis file = analysis[index];
-			Vector3 basePos = ComputeTowerPosition(index);
-			var blocks = ComputeBlocks(file);
+			Vector3 basePos = LayoutCalculator.ComputeTowerPosition(index);
+			var blocks = LayoutCalculator.ComputeBlocks(file);
 			// Note: block centers are relative to tower root; tower root is placed at basePos.
 			result.Add(new TowerLayout(file.File, index, basePos, blocks));
 		}
+
 		return result;
 	}
+
+	public static class Constants
+	{
+		public const float UnitsPerLine = 0.02f; // 50 lines per unit
+		public const float TowerSpacing = 3.0f;
+		public const float BlockWidth = 1.0f;
+		public const float BlockDepth = 1.0f;
+	}
+
+	public sealed record BlockLayout(
+		int Index,
+		LineType LineType,
+		float Height,
+		Vector3 Size,
+		Vector3 CenterPosition
+	);
+
+	public sealed record TowerLayout(
+		string File,
+		int GridIndex,
+		Vector3 Position,
+		IReadOnlyList<BlockLayout> Blocks
+	);
 }

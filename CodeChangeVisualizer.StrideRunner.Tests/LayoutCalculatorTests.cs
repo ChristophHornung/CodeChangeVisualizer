@@ -6,19 +6,35 @@ using Xunit;
 public class LayoutCalculatorTests
 {
 	[Fact]
-	public void ComputeTowerPosition_ShouldUseSquareGrid()
+	public void ApplyDiff_ThenComputeBlocks_ShouldReflectTargetLayout()
 	{
-		// indices: 0 -> (0,0), 1 -> (3,0), 2 -> (0,3) for spacing=3
-		var p0 = LayoutCalculator.ComputeTowerPosition(0);
-		var p1 = LayoutCalculator.ComputeTowerPosition(1);
-		var p2 = LayoutCalculator.ComputeTowerPosition(2);
+		var old = new FileAnalysis
+		{
+			File = "b.cs",
+			Lines =
+			[
+				new LineGroup { Type = LineType.Code, Length = 3 },
+				new LineGroup { Type = LineType.Comment, Length = 2 }
+			]
+		};
 
-		Assert.Equal(0f, p0.X, 3);
-		Assert.Equal(0f, p0.Z, 3);
-		Assert.Equal(LayoutCalculator.Constants.TowerSpacing, p1.X, 3);
-		Assert.Equal(0f, p1.Z, 3);
-		Assert.Equal(0f, p2.X, 3);
-		Assert.Equal(LayoutCalculator.Constants.TowerSpacing, p2.Z, 3);
+		var edits = new List<DiffEdit>
+		{
+			new() { Kind = DiffOpType.Resize, Index = 0, LineType = LineType.Code, OldLength = 3, NewLength = 4 },
+			new() { Kind = DiffOpType.Remove, Index = 1, LineType = LineType.Comment, OldLength = 2 },
+			new() { Kind = DiffOpType.Insert, Index = 1, LineType = LineType.Comment, NewLength = 5 }
+		};
+		var diff = new FileAnalysisDiff { Kind = FileAnalysisChangeKind.Modify, Edits = edits };
+
+		FileAnalysis target = FileAnalysisApplier.Apply(old, diff, old.File);
+		var blocks = LayoutCalculator.ComputeBlocks(target);
+
+		float u = LayoutCalculator.Constants.UnitsPerLine;
+		Assert.Equal(2, blocks.Count);
+		Assert.Equal(4 * u, blocks[0].Height, 6);
+		Assert.Equal(5 * u, blocks[1].Height, 6);
+		Assert.Equal((4 * u) / 2f, blocks[0].CenterPosition.Y, 6);
+		Assert.Equal(4 * u + (5 * u) / 2f, blocks[1].CenterPosition.Y, 6);
 	}
 
 	[Fact]
@@ -55,34 +71,18 @@ public class LayoutCalculatorTests
 	}
 
 	[Fact]
-	public void ApplyDiff_ThenComputeBlocks_ShouldReflectTargetLayout()
+	public void ComputeTowerPosition_ShouldUseSquareGrid()
 	{
-		var old = new FileAnalysis
-		{
-			File = "b.cs",
-			Lines =
-			[
-				new LineGroup { Type = LineType.Code, Length = 3 },
-				new LineGroup { Type = LineType.Comment, Length = 2 }
-			]
-		};
+		// indices: 0 -> (0,0), 1 -> (3,0), 2 -> (0,3) for spacing=3
+		var p0 = LayoutCalculator.ComputeTowerPosition(0);
+		var p1 = LayoutCalculator.ComputeTowerPosition(1);
+		var p2 = LayoutCalculator.ComputeTowerPosition(2);
 
-		var edits = new List<DiffEdit>
-		{
-			new() { Kind = DiffOpType.Resize, Index = 0, LineType = LineType.Code, OldLength = 3, NewLength = 4 },
-			new() { Kind = DiffOpType.Remove, Index = 1, LineType = LineType.Comment, OldLength = 2 },
-			new() { Kind = DiffOpType.Insert, Index = 1, LineType = LineType.Comment, NewLength = 5 }
-		};
-		var diff = new FileAnalysisDiff { Kind = FileAnalysisChangeKind.Modify, Edits = edits };
-
-		FileAnalysis target = FileAnalysisApplier.Apply(old, diff, old.File);
-		var blocks = LayoutCalculator.ComputeBlocks(target);
-
-		float u = LayoutCalculator.Constants.UnitsPerLine;
-		Assert.Equal(2, blocks.Count);
-		Assert.Equal(4 * u, blocks[0].Height, 6);
-		Assert.Equal(5 * u, blocks[1].Height, 6);
-		Assert.Equal((4 * u) / 2f, blocks[0].CenterPosition.Y, 6);
-		Assert.Equal(4 * u + (5 * u) / 2f, blocks[1].CenterPosition.Y, 6);
+		Assert.Equal(0f, p0.X, 3);
+		Assert.Equal(0f, p0.Z, 3);
+		Assert.Equal(LayoutCalculator.Constants.TowerSpacing, p1.X, 3);
+		Assert.Equal(0f, p1.Z, 3);
+		Assert.Equal(0f, p2.X, 3);
+		Assert.Equal(LayoutCalculator.Constants.TowerSpacing, p2.Z, 3);
 	}
 }

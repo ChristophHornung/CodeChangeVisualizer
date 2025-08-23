@@ -80,16 +80,6 @@ public class HoverTooltipScript : SyncScript
 		}
 	}
 
-	private void RefreshBlocks()
-	{
-		// Rebuild block cache each frame to include newly added towers/blocks
-		this._blocks.Clear();
-		foreach (Entity entity in this.SceneSystem.SceneInstance?.RootScene.Entities ?? Enumerable.Empty<Entity>())
-		{
-			this.CollectBlocksRecursive(entity);
-		}
-	}
-
 	public override void Update()
 	{
 		this.RefreshBlocks();
@@ -152,6 +142,7 @@ public class HoverTooltipScript : SyncScript
 			{
 				towerRoot = towerRoot.GetParent();
 			}
+
 			string fileName = towerRoot?.Name ?? closestBlock.Name;
 			// As a safety, strip any line-range suffix like " [start-end] ..." if present
 			int idx = fileName.IndexOf(" [");
@@ -172,6 +163,16 @@ public class HoverTooltipScript : SyncScript
 
 			// Print for this frame (call every frame while hovering)
 			(this.Game as Game)?.DebugTextSystem?.Print(fileName, screenPos, Color4.White);
+		}
+	}
+
+	private void RefreshBlocks()
+	{
+		// Rebuild block cache each frame to include newly added towers/blocks
+		this._blocks.Clear();
+		foreach (Entity entity in this.SceneSystem.SceneInstance?.RootScene.Entities ?? Enumerable.Empty<Entity>())
+		{
+			this.CollectBlocksRecursive(entity);
 		}
 	}
 

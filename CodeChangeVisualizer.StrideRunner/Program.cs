@@ -52,7 +52,10 @@ internal class Program
 					PropertyNameCaseInsensitive = true
 				});
 			}
-			catch { /* ignore; try other formats */ }
+			catch
+			{
+				/* ignore; try other formats */
+			}
 
 			revForPlayback = revLog;
 			if (revForPlayback != null && revForPlayback.Revisions != null && revForPlayback.Revisions.Count > 0)
@@ -64,11 +67,16 @@ internal class Program
 					Console.WriteLine("Error: Revision log missing initial full analysis.");
 					return;
 				}
+
 				Dictionary<string, FileAnalysis> files = revs[0].Analysis.ToDictionary(f => f.File, f => f);
 				for (int i = 1; i < revs.Count; i++)
 				{
 					RevisionEntry entry = revs[i];
-					if (entry.Diff == null) continue;
+					if (entry.Diff == null)
+					{
+						continue;
+					}
+
 					foreach (FileChangeEntry change in entry.Diff)
 					{
 						string file = change.File;
@@ -81,7 +89,13 @@ internal class Program
 									.Select(g => new LineGroup { Type = g.Type, Length = g.Length, Start = g.Start })
 									.ToList();
 								// Recompute Start
-								int s = 0; foreach (var lg in lines) { lg.Start = s; s += lg.Length; }
+								int s = 0;
+								foreach (var lg in lines)
+								{
+									lg.Start = s;
+									s += lg.Length;
+								}
+
 								files[file] = new FileAnalysis { File = file, Lines = lines };
 								break;
 							}
@@ -97,13 +111,15 @@ internal class Program
 								{
 									oldFa = new FileAnalysis { File = file, Lines = new List<LineGroup>() };
 								}
+
 								FileAnalysis patched = FileAnalysisApplier.Apply(oldFa, fad, file);
 								files[file] = patched;
 								break;
- 						}
+							}
 						}
 					} // end foreach file change
 				} // end for each revision
+
 				analysis = revs[0].Analysis.OrderBy(f => f.File, StringComparer.OrdinalIgnoreCase).ToList();
 			}
 			else
@@ -115,7 +131,10 @@ internal class Program
 						PropertyNameCaseInsensitive = true
 					});
 				}
-				catch { /* ignore */ }
+				catch
+				{
+					/* ignore */
+				}
 
 				if (dirAnalysis != null && dirAnalysis.Files != null && dirAnalysis.Files.Count > 0)
 				{
@@ -182,7 +201,8 @@ internal class Program
 					};
 					diffEntity.Add(script);
 					rootScene.Entities.Add(diffEntity);
-					Console.WriteLine("Press SPACE to apply next diff (2s per step). Press 'L' to autoplay remaining steps.");
+					Console.WriteLine(
+						"Press SPACE to apply next diff (2s per step). Press 'L' to autoplay remaining steps.");
 				}
 			}
 		});

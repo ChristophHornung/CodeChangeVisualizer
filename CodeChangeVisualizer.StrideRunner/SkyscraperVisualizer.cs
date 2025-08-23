@@ -5,12 +5,10 @@ using Stride.CommunityToolkit.Bepu;
 using Stride.CommunityToolkit.Rendering.ProceduralModels;
 using Stride.Core.Mathematics;
 using Stride.Engine;
+using Stride.Graphics;
 using Stride.Rendering;
 using Stride.Rendering.Materials;
 using Stride.Rendering.Materials.ComputeColors;
-using System.Linq;
-using Stride.Graphics;
-using System.Collections.Generic;
 
 /// <summary>
 /// Builds a Stride Scene representing the analysis as a set of "skyscraper" towers.
@@ -22,7 +20,9 @@ public class SkyscraperVisualizer
 	private const float BlockWidth = LayoutCalculator.Constants.BlockWidth;
 	private const float BlockDepth = LayoutCalculator.Constants.BlockDepth;
 	private const float UnitsPerLine = LayoutCalculator.Constants.UnitsPerLine; // 50 lines per unit (adjust as needed)
-	private const float TowerSpacing = LayoutCalculator.Constants.TowerSpacing; // Increased spacing for better visibility
+
+	private const float
+		TowerSpacing = LayoutCalculator.Constants.TowerSpacing; // Increased spacing for better visibility
 
 	private static readonly Dictionary<LineType, Color4> LineTypeColors = new()
 	{
@@ -42,19 +42,23 @@ public class SkyscraperVisualizer
 
 	private static void EnsureUnitCubeModel(Game game)
 	{
-		if (s_UnitCubeModel != null) return;
+		if (SkyscraperVisualizer.s_UnitCubeModel != null)
+		{
+			return;
+		}
+
 		// Create a 1x1x1 cube once and reuse its Model
 		var createOptions = new Primitive3DCreationOptions { Size = new Vector3(1f, 1f, 1f), IncludeCollider = false };
 		Entity temp = game.Create3DPrimitive(PrimitiveModelType.Cube, createOptions);
 		var modelComp = temp.Get<ModelComponent>();
-		s_UnitCubeModel = modelComp?.Model;
+		SkyscraperVisualizer.s_UnitCubeModel = modelComp?.Model;
 		// We don't add temp to the scene; it will be GC'ed. We only keep the Model reference.
 	}
 
 	private static Material GetOrCreateSolidColorMaterial(Game game, Color4 color)
 	{
 		int key = color.ToRgba();
-		if (MaterialCache.TryGetValue(key, out var cached))
+		if (SkyscraperVisualizer.MaterialCache.TryGetValue(key, out var cached))
 		{
 			return cached;
 		}
@@ -70,8 +74,46 @@ public class SkyscraperVisualizer
 		};
 
 		var material = Material.New(game.GraphicsDevice, materialDesc);
-		MaterialCache[key] = material;
+		SkyscraperVisualizer.MaterialCache[key] = material;
 		return material;
+	}
+
+	private static CameraComponent? FindCamera(Scene scene)
+	{
+		// Search all entities recursively for a CameraComponent
+		foreach (var root in scene.Entities)
+		{
+			var cam = SkyscraperVisualizer.FindCameraRecursive(root);
+			if (cam != null)
+			{
+				return cam;
+			}
+		}
+
+		return null;
+	}
+
+	private static CameraComponent? FindCameraRecursive(Entity entity)
+	{
+		var cam = entity.Get<CameraComponent>();
+		if (cam != null)
+		{
+			return cam;
+		}
+
+		foreach (var child in entity.Transform.Children)
+		{
+			if (child.Entity != null)
+			{
+				var found = SkyscraperVisualizer.FindCameraRecursive(child.Entity);
+				if (found != null)
+				{
+					return found;
+				}
+			}
+		}
+
+		return null;
 	}
 
 	/// <summary>
@@ -136,9 +178,11 @@ public class SkyscraperVisualizer
 
 		float width = (cols - 1) * SkyscraperVisualizer.TowerSpacing;
 		float depth = (rows - 1) * SkyscraperVisualizer.TowerSpacing;
-		float maxHeight = analysis.Select(f => (f.Lines?.Sum(g => g.Length) ?? 0) * SkyscraperVisualizer.UnitsPerLine).DefaultIfEmpty(0f).Max();
+		float maxHeight = analysis.Select(f => (f.Lines?.Sum(g => g.Length) ?? 0) * SkyscraperVisualizer.UnitsPerLine)
+			.DefaultIfEmpty(0f).Max();
 
-		Console.WriteLine($"[CameraFit] count={count} gridSize={gridSize} rows={rows} cols={cols} width={width:F2} depth={depth:F2} maxHeight={maxHeight:F2}");
+		Console.WriteLine(
+			$"[CameraFit] count={count} gridSize={gridSize} rows={rows} cols={cols} width={width:F2} depth={depth:F2} maxHeight={maxHeight:F2}");
 
 		// Find a camera in the scene (search recursively)
 		CameraComponent? camera = SkyscraperVisualizer.FindCamera(scene);
@@ -147,6 +191,7 @@ public class SkyscraperVisualizer
 			Console.WriteLine("[CameraFit] No camera found in scene.");
 			return;
 		}
+
 		Console.WriteLine($"[CameraFit] Using camera entity: {camera.Entity?.Name}");
 
 		// Compute center of bounds
@@ -160,10 +205,13 @@ public class SkyscraperVisualizer
 		}
 
 		Texture? backBuffer = game.GraphicsDevice?.Presenter?.BackBuffer;
-		float aspect = (backBuffer != null && backBuffer.Height > 0) ? (float)backBuffer.Width / backBuffer.Height : (16f / 9f);
+		float aspect = (backBuffer != null && backBuffer.Height > 0)
+			? (float)backBuffer.Width / backBuffer.Height
+			: (16f / 9f);
 		float hfov = 2f * (float)Math.Atan(Math.Tan(vfov / 2f) * aspect);
 		float limitingFov = Math.Min(vfov, hfov);
-		Console.WriteLine($"[CameraFit] aspect={aspect:F3} vfovDeg={MathUtil.RadiansToDegrees(vfov):F1} hfovDeg={MathUtil.RadiansToDegrees(hfov):F1} limitingFovDeg={MathUtil.RadiansToDegrees(limitingFov):F1}");
+		Console.WriteLine(
+			$"[CameraFit] aspect={aspect:F3} vfovDeg={MathUtil.RadiansToDegrees(vfov):F1} hfovDeg={MathUtil.RadiansToDegrees(hfov):F1} limitingFovDeg={MathUtil.RadiansToDegrees(limitingFov):F1}");
 
 		// Distance to fit the sphere inside frustum using limiting FOV; add a margin
 		float distance = radius / (float)Math.Sin(Math.Max(0.1f, limitingFov / 2f));
@@ -177,7 +225,8 @@ public class SkyscraperVisualizer
 		// Rotate azimuth by 180° (flip X/Z) to face the city while keeping 45° elevation downward.
 		Vector3 dir = Vector3.Normalize(new Vector3(1f, -(float)Math.Sqrt(2), 1f));
 		Vector3 position = center - dir * distance;
-		Console.WriteLine($"[CameraFit] dir=({dir.X:F3},{dir.Y:F3},{dir.Z:F3}) position=({position.X:F2},{position.Y:F2},{position.Z:F2}) center=({center.X:F2},{center.Y:F2},{center.Z:F2})");
+		Console.WriteLine(
+			$"[CameraFit] dir=({dir.X:F3},{dir.Y:F3},{dir.Z:F3}) position=({position.X:F2},{position.Y:F2},{position.Z:F2}) center=({center.X:F2},{center.Y:F2},{center.Z:F2})");
 
 		Entity camEntity = camera.Entity;
 		camEntity.Transform.Position = position;
@@ -190,42 +239,8 @@ public class SkyscraperVisualizer
 		float appliedYaw = yaw + MathUtil.Pi;
 		float appliedPitch = -Math.Abs(pitch);
 		camEntity.Transform.Rotation = Quaternion.RotationYawPitchRoll(appliedYaw, appliedPitch, 0f);
-		Console.WriteLine($"[CameraFit] yawDeg={MathUtil.RadiansToDegrees(appliedYaw):F1} pitchDeg={MathUtil.RadiansToDegrees(appliedPitch):F1} (applied, yaw+180, downward pitch)");
-	}
-
-	private static CameraComponent? FindCamera(Scene scene)
-	{
-		// Search all entities recursively for a CameraComponent
-		foreach (var root in scene.Entities)
-		{
-			var cam = FindCameraRecursive(root);
-			if (cam != null)
-			{
-				return cam;
-			}
-		}
-		return null;
-	}
-
-	private static CameraComponent? FindCameraRecursive(Entity entity)
-	{
-		var cam = entity.Get<CameraComponent>();
-		if (cam != null)
-		{
-			return cam;
-		}
-		foreach (var child in entity.Transform.Children)
-		{
-			if (child.Entity != null)
-			{
-				var found = FindCameraRecursive(child.Entity);
-				if (found != null)
-				{
-					return found;
-				}
-			}
-		}
-		return null;
+		Console.WriteLine(
+			$"[CameraFit] yawDeg={MathUtil.RadiansToDegrees(appliedYaw):F1} pitchDeg={MathUtil.RadiansToDegrees(appliedPitch):F1} (applied, yaw+180, downward pitch)");
 	}
 
 	/// <summary>
@@ -241,7 +256,7 @@ public class SkyscraperVisualizer
 	/// <summary>
 	/// Builds all blocks for a single tower.
 	/// </summary>
- private void BuildTowerBlocks(FileAnalysis file, Entity fileRoot, Game game)
+	private void BuildTowerBlocks(FileAnalysis file, Entity fileRoot, Game game)
 	{
 		SkyscraperVisualizer.EnsureUnitCubeModel(game);
 		float currentY = 0f;
@@ -261,17 +276,18 @@ public class SkyscraperVisualizer
 	/// <summary>
 	/// Creates a single block for a line group.
 	/// </summary>
- private Entity CreateBlock(FileAnalysis file, LineGroup group, float currentY, Game game)
+	private Entity CreateBlock(FileAnalysis file, LineGroup group, float currentY, Game game)
 	{
 		float height = group.Length * SkyscraperVisualizer.UnitsPerLine;
 		Color4 color = SkyscraperVisualizer.LineTypeColors[group.Type];
 
 		// Create an entity that reuses a shared unit-cube model and scale it to desired size
 		Entity cube = new Entity(file.File);
-		if (s_UnitCubeModel != null)
+		if (SkyscraperVisualizer.s_UnitCubeModel != null)
 		{
-			cube.Add(new ModelComponent { Model = s_UnitCubeModel });
+			cube.Add(new ModelComponent { Model = SkyscraperVisualizer.s_UnitCubeModel });
 		}
+
 		cube.Transform.Position = new Vector3(0f, currentY + height / 2, 0f);
 		cube.Transform.Scale = new Vector3(SkyscraperVisualizer.BlockWidth, height, SkyscraperVisualizer.BlockDepth);
 
@@ -301,7 +317,7 @@ public class SkyscraperVisualizer
 		}
 
 		// Use a cached material for this color to reduce allocations and state changes
-		Material material = GetOrCreateSolidColorMaterial(game, color);
+		Material material = SkyscraperVisualizer.GetOrCreateSolidColorMaterial(game, color);
 
 		// IMPORTANT: assign per-entity override, not the shared Model's materials
 		var materials = modelComponent.Materials;

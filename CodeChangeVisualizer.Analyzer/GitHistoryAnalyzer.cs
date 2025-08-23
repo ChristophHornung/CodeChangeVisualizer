@@ -43,12 +43,15 @@ public static class GitHistoryAnalyzer
 		{
 			// Resolve to the first commit in the repository (root commit)
 			string roots = await GitHistoryAnalyzer.RunGitAsync("rev-list --max-parents=0 HEAD", workDir);
-			startSha = roots.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? string.Empty;
+			startSha =
+				roots.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ??
+				string.Empty;
 		}
 		else
 		{
 			startSha = (await GitHistoryAnalyzer.RunGitAsync($"rev-parse {gitStart}", workDir)).Trim();
 		}
+
 		if (string.IsNullOrWhiteSpace(startSha))
 		{
 			throw new InvalidOperationException($"Cannot resolve start git hash '{gitStart}'.");

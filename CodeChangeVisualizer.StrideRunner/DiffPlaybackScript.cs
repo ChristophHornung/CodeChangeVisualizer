@@ -1,17 +1,15 @@
 ﻿namespace CodeChangeVisualizer.StrideRunner;
 
 using CodeChangeVisualizer.Analyzer;
-using System.Linq;
-using Stride.CommunityToolkit.Engine;
-using Stride.CommunityToolkit.Rendering.ProceduralModels;
 using Stride.CommunityToolkit.Bepu;
+using Stride.CommunityToolkit.Rendering.ProceduralModels;
+using Stride.Core;
 using Stride.Core.Mathematics;
 using Stride.Engine;
 using Stride.Input;
 using Stride.Rendering;
 using Stride.Rendering.Materials;
 using Stride.Rendering.Materials.ComputeColors;
-using Stride.Core;
 
 /// <summary>
 /// Plays back a sequence of diffs (from advanced git analysis) step-by-step.
@@ -39,11 +37,6 @@ public class DiffPlaybackScript : SyncScript
 		[LineType.CodeAndComment] = new Color4(0.56f, 0.93f, 0.56f, 1f)
 	};
 
-	[DataMemberIgnore]
-	public List<FileAnalysis> InitialAnalysis { get; set; } = new();
-	[DataMemberIgnore]
-	public List<List<FileChangeEntry>> Diffs { get; set; } = new();
-
 	// Runtime state
 	private readonly Dictionary<string, FileAnalysis> _currentAnalyses = new(StringComparer.OrdinalIgnoreCase);
 	private readonly Dictionary<string, Entity> _towers = new(StringComparer.OrdinalIgnoreCase);
@@ -53,35 +46,51 @@ public class DiffPlaybackScript : SyncScript
 	// Animation state per step
 	private bool _animating;
 	private float _elapsed;
+
 	private StepAnimation? _currentStep;
+
 	// Autoplay flag: when true, we keep advancing steps automatically when not animating
 	private bool _autoPlay;
 
-	private class StepAnimation
-	{
-		public List<TowerAnim> Towers = new();
-	}
+	private Model? _templateModel;
 
-	private class TowerAnim
-	{
-		public string File = string.Empty;
-		public Entity? Root; // may be null for newly added until created
-		public bool IsDelete;
-		public bool IsAdd;
-		public List<BlockAnim> NewSequence = new(); // blocks that exist in the resulting state
-		public List<BlockAnim> Removed = new(); // blocks that vanish
-		public FileAnalysis? TargetAnalysis; // resulting analysis for this tower after the step
-		public Vector3 StartRootPos; // for sinking
-	}
+	[DataMemberIgnore]
+	public List<FileAnalysis> InitialAnalysis { get; set; } = new();
 
-	private class BlockAnim
+	[DataMemberIgnore]
+	public List<List<FileChangeEntry>> Diffs { get; set; } = new();
+
+	private static List<DiffEdit> BuildEditsForAddOrDelete(List<LineGroup> oldLines, List<LineGroup> newLines)
 	{
-		public Entity? Entity;
-		public Color4 Color;
-		public float StartHeight;
-		public float EndHeight;
-		public float CurrentHeight;
-		public bool IsNew; // true if inserted this step
+		if (oldLines.Count == 0 && newLines.Count > 0)
+		{
+			// pure add => inserts for each new block
+			List<DiffEdit> list = new();
+			for (int i = 0; i < newLines.Count; i++)
+			{
+				LineGroup g = newLines[i];
+				list.Add(new DiffEdit { Kind = DiffOpType.Insert, Index = i, LineType = g.Type, NewLength = g.Length });
+			}
+
+			return list;
+		}
+
+		if (oldLines.Count > 0 && newLines.Count == 0)
+		{
+			// pure delete => removes for each old block
+			List<DiffEdit> list = new();
+			for (int i = 0; i < oldLines.Count; i++)
+			{
+				LineGroup g = oldLines[i];
+				list.Add(new DiffEdit { Kind = DiffOpType.Remove, Index = i, LineType = g.Type, OldLength = g.Length });
+			}
+
+			return list;
+		}
+
+		// fallback: compute via Differ if needed
+		return Differ.Diff(new FileAnalysis { File = "", Lines = oldLines },
+			new FileAnalysis { File = "", Lines = newLines });
 	}
 
 	public override void Start()
@@ -91,8 +100,14 @@ public class DiffPlaybackScript : SyncScript
 		var roots = this.SceneSystem.SceneInstance?.RootScene.Entities;
 		foreach (var file in this.InitialAnalysis)
 		{
-			this._currentAnalyses[file.File] = new FileAnalysis { File = file.File, Lines = file.Lines.Select(g => new LineGroup { Type = g.Type, Length = g.Length, Start = g.Start }).ToList() };
-			Entity? root = roots.FirstOrDefault(e => string.Equals(e.Name, file.File, StringComparison.OrdinalIgnoreCase));
+			this._currentAnalyses[file.File] = new FileAnalysis
+			{
+				File = file.File,
+				Lines = file.Lines.Select(g => new LineGroup { Type = g.Type, Length = g.Length, Start = g.Start })
+					.ToList()
+			};
+			Entity? root =
+				roots.FirstOrDefault(e => string.Equals(e.Name, file.File, StringComparison.OrdinalIgnoreCase));
 			if (root != null)
 			{
 				this._towers[file.File] = root;
@@ -105,7 +120,10 @@ public class DiffPlaybackScript : SyncScript
 
 	public override void Update()
 	{
-		if (this.Input == null) return;
+		if (this.Input == null)
+		{
+			return;
+		}
 
 		if (!this._animating)
 		{
@@ -114,11 +132,13 @@ public class DiffPlaybackScript : SyncScript
 			{
 				this.ResetToInitialVisualization();
 			}
+
 			// Trigger next step on Space key
 			if (this.Input.IsKeyPressed(Keys.Space))
 			{
 				this.StartNextStep();
 			}
+
 			// Toggle autoplay with 'L' (play all remaining steps, sequentially)
 			if (this.Input.IsKeyPressed(Keys.L))
 			{
@@ -127,11 +147,13 @@ public class DiffPlaybackScript : SyncScript
 					? "[Playback] Autoplay ON (will advance with 2s per step)."
 					: "[Playback] Autoplay OFF.");
 			}
+
 			// If autoplay is enabled and not animating, attempt to start the next step
 			if (this._autoPlay)
 			{
 				this.StartNextStep();
 			}
+
 			return;
 		}
 
@@ -151,9 +173,11 @@ public class DiffPlaybackScript : SyncScript
 			{
 				if (tower.Root != null)
 				{
-					float y = MathUtil.Lerp(tower.StartRootPos.Y, tower.StartRootPos.Y - DiffPlaybackScript.SinkDistance, t);
+					float y = MathUtil.Lerp(tower.StartRootPos.Y,
+						tower.StartRootPos.Y - DiffPlaybackScript.SinkDistance, t);
 					tower.Root.Transform.Position = new Vector3(tower.StartRootPos.X, y, tower.StartRootPos.Z);
 				}
+
 				continue;
 			}
 
@@ -164,6 +188,7 @@ public class DiffPlaybackScript : SyncScript
 				b.CurrentHeight = MathUtil.Lerp(b.StartHeight, b.EndHeight, t);
 				this.ApplyBlockSize(b.Entity!, b.CurrentHeight);
 			}
+
 			foreach (BlockAnim b in tower.Removed)
 			{
 				b.CurrentHeight = MathUtil.Lerp(b.StartHeight, 0f, t);
@@ -177,7 +202,11 @@ public class DiffPlaybackScript : SyncScript
 			float currentY = 0f;
 			foreach (BlockAnim b in tower.NewSequence)
 			{
-				if (b.Entity == null) continue;
+				if (b.Entity == null)
+				{
+					continue;
+				}
+
 				float h = b.CurrentHeight;
 				b.Entity.Transform.Position = new Vector3(0f, currentY + h / 2f, 0f);
 				currentY += h;
@@ -196,6 +225,7 @@ public class DiffPlaybackScript : SyncScript
 						// remove from scene and maps
 						this.SceneSystem.SceneInstance?.RootScene.Entities.Remove(tower.Root);
 					}
+
 					this._towers.Remove(tower.File);
 					this._currentAnalyses.Remove(tower.File);
 					continue;
@@ -214,14 +244,21 @@ public class DiffPlaybackScript : SyncScript
 				// Normalize new sequence blocks to have absolute scale matching final size
 				foreach (BlockAnim b in tower.NewSequence)
 				{
-					if (b.Entity == null) continue;
+					if (b.Entity == null)
+					{
+						continue;
+					}
+
 					BlockDescriptorComponent? desc = b.Entity.Get<BlockDescriptorComponent>();
 					if (desc != null)
 					{
-						desc.Size = new Vector3(DiffPlaybackScript.BlockWidth, b.EndHeight, DiffPlaybackScript.BlockDepth);
+						desc.Size = new Vector3(DiffPlaybackScript.BlockWidth, b.EndHeight,
+							DiffPlaybackScript.BlockDepth);
 					}
+
 					// Set absolute transform scale to match final block size (consistent with SkyscraperVisualizer)
-					b.Entity.Transform.Scale = new Vector3(DiffPlaybackScript.BlockWidth, b.EndHeight, DiffPlaybackScript.BlockDepth);
+					b.Entity.Transform.Scale = new Vector3(DiffPlaybackScript.BlockWidth, b.EndHeight,
+						DiffPlaybackScript.BlockDepth);
 				}
 
 				// Update current analysis
@@ -271,7 +308,12 @@ public class DiffPlaybackScript : SyncScript
 			Entity fileRoot = this.CreateTowerRoot(file.File, index);
 			rootEntities?.Add(fileRoot);
 			this._towers[file.File] = fileRoot;
-			this._currentAnalyses[file.File] = new FileAnalysis { File = file.File, Lines = file.Lines.Select(g => new LineGroup { Type = g.Type, Length = g.Length, Start = g.Start }).ToList() };
+			this._currentAnalyses[file.File] = new FileAnalysis
+			{
+				File = file.File,
+				Lines = file.Lines.Select(g => new LineGroup { Type = g.Type, Length = g.Length, Start = g.Start })
+					.ToList()
+			};
 
 			// Build blocks
 			float currentY = 0f;
@@ -281,6 +323,7 @@ public class DiffPlaybackScript : SyncScript
 				fileRoot.AddChild(block);
 				currentY += group.Length * DiffPlaybackScript.UnitsPerLine;
 			}
+
 			index++;
 		}
 
@@ -295,6 +338,7 @@ public class DiffPlaybackScript : SyncScript
 			this._autoPlay = false;
 			return;
 		}
+
 		if (this._diffIndex >= this.Diffs.Count)
 		{
 			Console.WriteLine("[Playback] No more steps to play. Reached the end of the revision log.");
@@ -302,6 +346,7 @@ public class DiffPlaybackScript : SyncScript
 			this._autoPlay = false;
 			return;
 		}
+
 		Console.WriteLine($"[Playback] SPACE pressed: starting step {this._diffIndex + 1}/{this.Diffs.Count}");
 		List<FileChangeEntry> diff = this.Diffs[this._diffIndex];
 		Console.WriteLine($"[Playback] Step {this._diffIndex + 1}: {diff.Count} file change(s)");
@@ -350,6 +395,7 @@ public class DiffPlaybackScript : SyncScript
 					towerAnim.StartRootPos = root.Transform.Position;
 					step.Towers.Add(towerAnim);
 				}
+
 				// If no root (already absent), nothing to animate
 				continue;
 			}
@@ -381,6 +427,7 @@ public class DiffPlaybackScript : SyncScript
 						IsNew = true
 					});
 				}
+
 				step.Towers.Add(towerAnim);
 				continue;
 			}
@@ -396,7 +443,9 @@ public class DiffPlaybackScript : SyncScript
 
 			List<LineGroup> oldLines = current.Lines;
 			List<LineGroup> newLines = target.Lines;
-			List<DiffEdit> edits = fad.Kind == FileAnalysisChangeKind.Modify ? (fad.Edits ?? new()) : DiffPlaybackScript.BuildEditsForAddOrDelete(oldLines, newLines);
+			List<DiffEdit> edits = fad.Kind == FileAnalysisChangeKind.Modify
+				? (fad.Edits ?? new())
+				: DiffPlaybackScript.BuildEditsForAddOrDelete(oldLines, newLines);
 
 			int iOld = 0; // index in old
 			int iOp = 0; // index in edits
@@ -415,13 +464,19 @@ public class DiffPlaybackScript : SyncScript
 						float startH = oldLines[iOld].Length * DiffPlaybackScript.UnitsPerLine;
 						if (ent != null)
 						{
-							removed.Add(new BlockAnim { Entity = ent, Color = DiffPlaybackScript.LineTypeColors[oldLines[iOld].Type], StartHeight = startH, EndHeight = 0f, CurrentHeight = startH, IsNew = false });
+							removed.Add(new BlockAnim
+							{
+								Entity = ent, Color = DiffPlaybackScript.LineTypeColors[oldLines[iOld].Type],
+								StartHeight = startH, EndHeight = 0f, CurrentHeight = startH, IsNew = false
+							});
 						}
+
 						// Even if entity is missing, advance to keep indices consistent
 						iOld++;
 						iOp++;
 						continue;
 					}
+
 					if (op.Kind == DiffOpType.Insert && op.Index == newSeq.Count)
 					{
 						// create a new block entity with base of target height and 0 current height
@@ -434,14 +489,20 @@ public class DiffPlaybackScript : SyncScript
 						{
 							g = new LineGroup { Type = op.LineType, Length = op.NewLength ?? 0, Start = 0 };
 						}
+
 						float endH = (op.NewLength ?? g.Length) * DiffPlaybackScript.UnitsPerLine;
 						Entity block = this.CreateBlock(file, g, 0f);
 						this.ApplyBlockSize(block, 0f, endH);
 						root.AddChild(block);
-						newSeq.Add(new BlockAnim { Entity = block, Color = DiffPlaybackScript.LineTypeColors[g.Type], StartHeight = 0f, EndHeight = endH, CurrentHeight = 0f, IsNew = true });
+						newSeq.Add(new BlockAnim
+						{
+							Entity = block, Color = DiffPlaybackScript.LineTypeColors[g.Type], StartHeight = 0f,
+							EndHeight = endH, CurrentHeight = 0f, IsNew = true
+						});
 						iOp++;
 						continue;
 					}
+
 					if (op.Kind == DiffOpType.Resize && op.Index == newSeq.Count && iOld < oldLines.Count)
 					{
 						Entity? ent = iOld < oldBlocks.Count ? oldBlocks[iOld] : null;
@@ -455,12 +516,18 @@ public class DiffPlaybackScript : SyncScript
 							this.ApplyBlockSize(ent, startH, startH);
 							root.AddChild(ent);
 						}
-						newSeq.Add(new BlockAnim { Entity = ent, Color = DiffPlaybackScript.LineTypeColors[oldLines[iOld].Type], StartHeight = startH, EndHeight = endH, CurrentHeight = startH, IsNew = false });
+
+						newSeq.Add(new BlockAnim
+						{
+							Entity = ent, Color = DiffPlaybackScript.LineTypeColors[oldLines[iOld].Type],
+							StartHeight = startH, EndHeight = endH, CurrentHeight = startH, IsNew = false
+						});
 						iOld++;
 						iOp++;
 						continue;
 					}
 				}
+
 				if (iOld < oldLines.Count)
 				{
 					// passthrough unchanged block
@@ -474,10 +541,16 @@ public class DiffPlaybackScript : SyncScript
 						this.ApplyBlockSize(ent, h, h);
 						root.AddChild(ent);
 					}
-					newSeq.Add(new BlockAnim { Entity = ent, Color = DiffPlaybackScript.LineTypeColors[oldLines[iOld].Type], StartHeight = h, EndHeight = h, CurrentHeight = h, IsNew = false });
+
+					newSeq.Add(new BlockAnim
+					{
+						Entity = ent, Color = DiffPlaybackScript.LineTypeColors[oldLines[iOld].Type], StartHeight = h,
+						EndHeight = h, CurrentHeight = h, IsNew = false
+					});
 					iOld++;
 					continue;
 				}
+
 				// trailing inserts at end
 				if (iOp < edits.Count && edits[iOp].Kind == DiffOpType.Insert && edits[iOp].Index == newSeq.Count)
 				{
@@ -491,14 +564,20 @@ public class DiffPlaybackScript : SyncScript
 					{
 						g = new LineGroup { Type = op.LineType, Length = op.NewLength ?? 0, Start = 0 };
 					}
+
 					float endH = (op.NewLength ?? g.Length) * DiffPlaybackScript.UnitsPerLine;
 					Entity block = this.CreateBlock(file, g, 0f);
 					this.ApplyBlockSize(block, 0f, endH);
 					root.AddChild(block);
-					newSeq.Add(new BlockAnim { Entity = block, Color = DiffPlaybackScript.LineTypeColors[g.Type], StartHeight = 0f, EndHeight = endH, CurrentHeight = 0f, IsNew = true });
+					newSeq.Add(new BlockAnim
+					{
+						Entity = block, Color = DiffPlaybackScript.LineTypeColors[g.Type], StartHeight = 0f,
+						EndHeight = endH, CurrentHeight = 0f, IsNew = true
+					});
 					iOp++;
 					continue;
 				}
+
 				break;
 			}
 
@@ -510,39 +589,12 @@ public class DiffPlaybackScript : SyncScript
 		int addCount = step.Towers.Count(t => t.IsAdd);
 		int delCount = step.Towers.Count(t => t.IsDelete);
 		int modCount = step.Towers.Count - addCount - delCount;
-		Console.WriteLine($"[Playback] Step summary: towers affected={step.Towers.Count} (add={addCount}, delete={delCount}, modify={modCount})");
+		Console.WriteLine(
+			$"[Playback] Step summary: towers affected={step.Towers.Count} (add={addCount}, delete={delCount}, modify={modCount})");
 
 		this._currentStep = step;
 		this._elapsed = 0f;
 		this._animating = true;
-	}
-
-	private static List<DiffEdit> BuildEditsForAddOrDelete(List<LineGroup> oldLines, List<LineGroup> newLines)
-	{
-		if (oldLines.Count == 0 && newLines.Count > 0)
-		{
-			// pure add => inserts for each new block
-			List<DiffEdit> list = new();
-			for (int i = 0; i < newLines.Count; i++)
-			{
-				LineGroup g = newLines[i];
-				list.Add(new DiffEdit { Kind = DiffOpType.Insert, Index = i, LineType = g.Type, NewLength = g.Length });
-			}
-			return list;
-		}
-		if (oldLines.Count > 0 && newLines.Count == 0)
-		{
-			// pure delete => removes for each old block
-			List<DiffEdit> list = new();
-			for (int i = 0; i < oldLines.Count; i++)
-			{
-				LineGroup g = oldLines[i];
-				list.Add(new DiffEdit { Kind = DiffOpType.Remove, Index = i, LineType = g.Type, OldLength = g.Length });
-			}
-			return list;
-		}
-		// fallback: compute via Differ if needed
-		return Differ.Diff(new FileAnalysis { File = "", Lines = oldLines }, new FileAnalysis { File = "", Lines = newLines });
 	}
 
 	private Entity CreateTowerRoot(string file, int index)
@@ -556,8 +608,6 @@ public class DiffPlaybackScript : SyncScript
 		fileRoot.Transform.Position = new Vector3(x, 0f, z);
 		return fileRoot;
 	}
-
-	private Model? _templateModel;
 
 	private void EnsureTemplateModel()
 	{
@@ -587,7 +637,8 @@ public class DiffPlaybackScript : SyncScript
 			var game = this.Game as Game;
 			if (game != null)
 			{
-				var createOptions = new Primitive3DCreationOptions { Size = new Vector3(1f, 1f, 1f), IncludeCollider = false };
+				var createOptions = new Primitive3DCreationOptions
+					{ Size = new Vector3(1f, 1f, 1f), IncludeCollider = false };
 				Entity temp = game.Create3DPrimitive(PrimitiveModelType.Cube, createOptions);
 				var modelComp = temp.Get<ModelComponent>();
 				if (modelComp != null)
@@ -612,8 +663,12 @@ public class DiffPlaybackScript : SyncScript
 		{
 			cube.Add(new ModelComponent { Model = this._templateModel });
 		}
+
 		cube.Transform.Position = new Vector3(0f, currentY + height / 2f, 0f);
-		cube.Add(new BlockDescriptorComponent { Size = new Vector3(DiffPlaybackScript.BlockWidth, height, DiffPlaybackScript.BlockDepth), Color = color });
+		cube.Add(new BlockDescriptorComponent
+		{
+			Size = new Vector3(DiffPlaybackScript.BlockWidth, height, DiffPlaybackScript.BlockDepth), Color = color
+		});
 
 		// Ensure per-entity material override so colors don't bleed across shared model instances
 		this.ApplyColorToCube(cube, color);
@@ -623,7 +678,10 @@ public class DiffPlaybackScript : SyncScript
 	private void ApplyBlockSize(Entity block, float currentHeight, float? baseHeightOverride = null)
 	{
 		BlockDescriptorComponent? desc = block.Get<BlockDescriptorComponent>();
-		if (desc == null) return;
+		if (desc == null)
+		{
+			return;
+		}
 
 		// Use absolute scaling so it matches SkyscraperVisualizer and avoids X/Z scale loss.
 		float clampedH = Math.Max(0f, currentHeight);
@@ -639,11 +697,13 @@ public class DiffPlaybackScript : SyncScript
 		{
 			return;
 		}
+
 		var game = this.Game as Game;
 		if (game?.GraphicsDevice == null)
 		{
 			return;
 		}
+
 		MaterialDescriptor materialDesc = new()
 		{
 			Attributes = new MaterialAttributes
@@ -664,5 +724,32 @@ public class DiffPlaybackScript : SyncScript
 		{
 			materials.Add(new KeyValuePair<int, Material>(0, material));
 		}
- }
+	}
+
+	private class StepAnimation
+	{
+		public List<TowerAnim> Towers = new();
+	}
+
+	private class TowerAnim
+	{
+		public string File = string.Empty;
+		public Entity? Root; // may be null for newly added until created
+		public bool IsDelete;
+		public bool IsAdd;
+		public List<BlockAnim> NewSequence = new(); // blocks that exist in the resulting state
+		public List<BlockAnim> Removed = new(); // blocks that vanish
+		public FileAnalysis? TargetAnalysis; // resulting analysis for this tower after the step
+		public Vector3 StartRootPos; // for sinking
+	}
+
+	private class BlockAnim
+	{
+		public Entity? Entity;
+		public Color4 Color;
+		public float StartHeight;
+		public float EndHeight;
+		public float CurrentHeight;
+		public bool IsNew; // true if inserted this step
+	}
 }

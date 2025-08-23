@@ -1,18 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="xunit" />
-    <PackageReference Include="xunit.runner.visualstudio" />
-    <PackageReference Include="coverlet.collector" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\CodeChangeVisualizer.Analyzer\CodeChangeVisualizer.Analyzer.csproj" />
-    <ProjectReference Include="..\CodeChangeVisualizer.StrideRunner\CodeChangeVisualizer.StrideRunner.csproj" />
-  </ItemGroup>
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<IsPackable>false</IsPackable>
+		<IsTestProject>true</IsTestProject>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="Microsoft.NET.Test.Sdk"/>
+		<PackageReference Include="xunit"/>
+		<PackageReference Include="xunit.runner.visualstudio"/>
+		<PackageReference Include="coverlet.collector"/>
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\CodeChangeVisualizer.Analyzer\CodeChangeVisualizer.Analyzer.csproj"/>
+		<ProjectReference Include="..\CodeChangeVisualizer.StrideRunner\CodeChangeVisualizer.StrideRunner.csproj"/>
+	</ItemGroup>
 </Project>
