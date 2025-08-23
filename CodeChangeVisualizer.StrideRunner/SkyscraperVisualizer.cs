@@ -136,27 +136,23 @@ public class SkyscraperVisualizer
 	/// </summary>
 	private void BuildTowers(Scene scene, List<FileAnalysis> analysis, Game game)
 	{
-		// Arrange towers in a square grid (city block) rather than a single line
+		// Arrange towers using a city planner abstraction
 		int count = analysis.Count;
 		if (count == 0)
 		{
 			return;
 		}
-
-		int gridSize = (int)Math.Ceiling(Math.Sqrt(count));
+		
+		ICityPlanner planner = new GridCityPlanner();
 		int index = 0;
 		foreach (FileAnalysis file in analysis)
 		{
-			int row = index / gridSize;
-			int col = index % gridSize;
-			float x = col * SkyscraperVisualizer.TowerSpacing;
-			float z = row * SkyscraperVisualizer.TowerSpacing;
-
-			Entity fileRoot = this.CreateTowerRoot(file, x, z);
+			Vector3 pos = planner.GetPosition(index, analysis);
+			Entity fileRoot = this.CreateTowerRoot(file, pos.X, pos.Z);
 			scene.Entities.Add(fileRoot);
-
+			
 			this.BuildTowerBlocks(file, fileRoot, game);
-
+			
 			index++;
 		}
 	}
@@ -171,11 +167,10 @@ public class SkyscraperVisualizer
 		{
 			return;
 		}
-
-		int gridSize = (int)Math.Ceiling(Math.Sqrt(count));
-		int rows = (int)Math.Ceiling((float)count / gridSize);
-		int cols = Math.Min(gridSize, count);
-
+		
+		ICityPlanner planner = new GridCityPlanner();
+		var (rows, cols, gridSize) = planner.GetGrid(analysis);
+		
 		float width = (cols - 1) * SkyscraperVisualizer.TowerSpacing;
 		float depth = (rows - 1) * SkyscraperVisualizer.TowerSpacing;
 		float maxHeight = analysis.Select(f => (f.Lines?.Sum(g => g.Length) ?? 0) * SkyscraperVisualizer.UnitsPerLine)

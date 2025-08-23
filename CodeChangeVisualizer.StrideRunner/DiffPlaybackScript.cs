@@ -318,11 +318,14 @@ public class DiffPlaybackScript : SyncScript
 		// Reset playback to the beginning and rebuild the towers using the same layout logic as creation
 		this._diffIndex = 0;
 
-		// Rebuild the towers using the same layout logic as creation
-		int index = 0;
-		foreach (var file in this.InitialAnalysis)
+		// Rebuild the towers using the same layout logic as creation via the planner
+		int total = this.InitialAnalysis.Count;
+		for (int index = 0; index < total; index++)
 		{
-			Entity fileRoot = this.CreateTowerRoot(file.File, index);
+			var file = this.InitialAnalysis[index];
+			Vector3 pos = this._planner.GetPosition(index, this.InitialAnalysis);
+			Entity fileRoot = new Entity(file.File);
+			fileRoot.Transform.Position = new Vector3(pos.X, 0f, pos.Z);
 			rootEntities?.Add(fileRoot);
 			this._towers[file.File] = fileRoot;
 			this._currentAnalyses[file.File] = new FileAnalysis
@@ -331,7 +334,7 @@ public class DiffPlaybackScript : SyncScript
 				Lines = file.Lines.Select(g => new LineGroup { Type = g.Type, Length = g.Length, Start = g.Start })
 					.ToList()
 			};
-
+			
 			// Build blocks
 			float currentY = 0f;
 			foreach (var group in file.Lines)
@@ -340,10 +343,8 @@ public class DiffPlaybackScript : SyncScript
 				fileRoot.AddChild(block);
 				currentY += group.Length * DiffPlaybackScript.UnitsPerLine;
 			}
-
-			index++;
 		}
-
+		
 		this._nextGridIndex = this._towers.Count;
 	}
 
@@ -620,17 +621,22 @@ public class DiffPlaybackScript : SyncScript
 		this._animating = true;
 	}
 
-	private Entity CreateTowerRoot(string file, int index)
-	{
-		int gridSize = (int)Math.Ceiling(Math.Sqrt(index + 1));
-		int row = index / gridSize;
-		int col = index % gridSize;
-		float x = col * DiffPlaybackScript.TowerSpacing;
-		float z = row * DiffPlaybackScript.TowerSpacing;
-		Entity fileRoot = new Entity(file);
-		fileRoot.Transform.Position = new Vector3(x, 0f, z);
-		return fileRoot;
-	}
+ private readonly ICityPlanner _planner = new GridCityPlanner();
+
+ private Entity CreateTowerRoot(string file, int index)
+ {
+ 	// Build a file list representing current files plus this new file to determine position.
+ 	var filesList = this._currentAnalyses.Values.ToList();
+ 	if (!filesList.Any(f => string.Equals(f.File, file, StringComparison.OrdinalIgnoreCase)))
+ 	{
+ 		// If we have a target analysis for this file in the current step, prefer that; otherwise, create a stub.
+ 		filesList.Add(new FileAnalysis { File = file, Lines = new List<LineGroup>() });
+ 	}
+ 	Vector3 pos = this._planner.GetPosition(index, filesList);
+ 	Entity fileRoot = new Entity(file);
+ 	fileRoot.Transform.Position = new Vector3(pos.X, 0f, pos.Z);
+ 	return fileRoot;
+ }
 
 	private void EnsureTemplateModel()
 	{
