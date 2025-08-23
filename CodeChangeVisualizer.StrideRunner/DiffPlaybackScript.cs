@@ -22,10 +22,10 @@ using Stride.Core;
 public class DiffPlaybackScript : SyncScript
 {
 	// Constants should match SkyscraperVisualizer for visual consistency
-	private const float UnitsPerLine = 0.02f; // same as visualizer
-	private const float TowerSpacing = 3.0f;
-	private const float BlockWidth = 1.0f;
-	private const float BlockDepth = 1.0f;
+	private const float UnitsPerLine = LayoutCalculator.Constants.UnitsPerLine; // same as visualizer
+	private const float TowerSpacing = LayoutCalculator.Constants.TowerSpacing;
+	private const float BlockWidth = LayoutCalculator.Constants.BlockWidth;
+	private const float BlockDepth = LayoutCalculator.Constants.BlockDepth;
 	private const float AnimationDuration = 2.0f; // seconds per step
 	private const float SinkDistance = 3.0f; // how far to sink deleted towers below ground
 

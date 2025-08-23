@@ -18,11 +18,11 @@ using System.Collections.Generic;
 /// </summary>
 public class SkyscraperVisualizer
 {
-	// World units
-	private const float BlockWidth = 1.0f;
-	private const float BlockDepth = 1.0f;
-	private const float UnitsPerLine = 0.02f; // 50 lines per unit (adjust as needed)
-	private const float TowerSpacing = 3.0f; // Increased spacing for better visibility
+	// World units (shared with LayoutCalculator)
+	private const float BlockWidth = LayoutCalculator.Constants.BlockWidth;
+	private const float BlockDepth = LayoutCalculator.Constants.BlockDepth;
+	private const float UnitsPerLine = LayoutCalculator.Constants.UnitsPerLine; // 50 lines per unit (adjust as needed)
+	private const float TowerSpacing = LayoutCalculator.Constants.TowerSpacing; // Increased spacing for better visibility
 
 	private static readonly Dictionary<LineType, Color4> LineTypeColors = new()
 	{
