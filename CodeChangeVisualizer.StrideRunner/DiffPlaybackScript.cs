@@ -215,6 +215,7 @@ public class DiffPlaybackScript : SyncScript
 				}
 			}
 
+			Console.WriteLine($"[Playback] Step {this._diffIndex} completed.");
 			this._animating = false;
 			this._currentStep = null;
 		}
@@ -272,9 +273,19 @@ public class DiffPlaybackScript : SyncScript
 
 	private void StartNextStep()
 	{
-		if (this.Diffs.Count == 0) return;
-		if (this._diffIndex >= this.Diffs.Count) return;
+		if (this.Diffs.Count == 0)
+		{
+			Console.WriteLine("[Playback] No diffs available.");
+			return;
+		}
+		if (this._diffIndex >= this.Diffs.Count)
+		{
+			Console.WriteLine("[Playback] No more steps to play. Reached the end of the revision log.");
+			return;
+		}
+		Console.WriteLine($"[Playback] SPACE pressed: starting step {this._diffIndex + 1}/{this.Diffs.Count}");
 		List<FileChangeEntry> diff = this.Diffs[this._diffIndex];
+		Console.WriteLine($"[Playback] Step {this._diffIndex + 1}: {diff.Count} file change(s)");
 		this._diffIndex++;
 
 		StepAnimation step = new StepAnimation();
@@ -283,6 +294,23 @@ public class DiffPlaybackScript : SyncScript
 		{
 			string file = change.File;
 			FileAnalysisDiff fad = change.Change;
+			if (fad.Kind == FileAnalysisChangeKind.Modify)
+			{
+				int total = fad.Edits?.Count ?? 0;
+				int ins = fad.Edits?.Count(e => e.Kind == DiffOpType.Insert) ?? 0;
+				int rem = fad.Edits?.Count(e => e.Kind == DiffOpType.Remove) ?? 0;
+				int res = fad.Edits?.Count(e => e.Kind == DiffOpType.Resize) ?? 0;
+				Console.WriteLine($"  [Playback] MODIFY {file}: edits={total} (ins={ins}, rem={rem}, res={res})");
+			}
+			else if (fad.Kind == FileAnalysisChangeKind.FileAdd)
+			{
+				int blocks = fad.NewFileLines?.Count ?? 0;
+				Console.WriteLine($"  [Playback] ADD {file}: {blocks} block(s)");
+			}
+			else if (fad.Kind == FileAnalysisChangeKind.FileDelete)
+			{
+				Console.WriteLine($"  [Playback] DELETE {file}");
+			}
 
 			this._currentAnalyses.TryGetValue(file, out FileAnalysis? current);
 			current ??= new FileAnalysis { File = file, Lines = new List<LineGroup>() };
@@ -459,6 +487,11 @@ public class DiffPlaybackScript : SyncScript
 			towerAnim.Removed = removed;
 			step.Towers.Add(towerAnim);
 		}
+
+		int addCount = step.Towers.Count(t => t.IsAdd);
+		int delCount = step.Towers.Count(t => t.IsDelete);
+		int modCount = step.Towers.Count - addCount - delCount;
+		Console.WriteLine($"[Playback] Step summary: towers affected={step.Towers.Count} (add={addCount}, delete={delCount}, modify={modCount})");
 
 		this._currentStep = step;
 		this._elapsed = 0f;
