@@ -9,7 +9,7 @@ using Stride.Graphics;
 /// <summary>
 /// Alternative planner that groups files by their folder.
 /// Each folder gets its own inner grid for its files, and folders are laid out on an outer grid.
-/// This can cause towers to move between steps when the set of files/folders changes.
+/// Stabilized: once a folder/file gets a slot, it keeps it across SetFiles updates. New items append.
 /// </summary>
 public sealed class FolderGridCityPlanner : ICityPlanner
 {
@@ -18,10 +18,18 @@ public sealed class FolderGridCityPlanner : ICityPlanner
 
 	private IReadOnlyList<FileAnalysis>? _files;
 	private List<string> _fileOrder = new();
-	private List<string> _folders = new();
-	private Dictionary<string, List<string>> _folderToFiles = new(StringComparer.OrdinalIgnoreCase);
-	private Dictionary<string, int> _folderIndex = new(StringComparer.OrdinalIgnoreCase);
-	private Dictionary<string, int> _fileLocalIndex = new(StringComparer.OrdinalIgnoreCase);
+
+	// Stable outer (folder) layout state
+	private readonly Dictionary<string, int> _folderAssignedIndex = new(StringComparer.OrdinalIgnoreCase);
+	private readonly Dictionary<string, Vector3> _folderPosition = new(StringComparer.OrdinalIgnoreCase);
+
+	// Stable inner (file-within-folder) layout state
+	private readonly Dictionary<string, int> _fileAssignedLocalIndex = new(StringComparer.OrdinalIgnoreCase); // by file path
+	private readonly Dictionary<string, Vector3> _fileLocalPosition = new(StringComparer.OrdinalIgnoreCase); // inner offset by file path
+
+	// Current mapping for quick GetPosition lookup aligned with latest SetFiles order
+	private readonly Dictionary<string, string> _fileToFolder = new(StringComparer.OrdinalIgnoreCase);
+	private List<Vector3> _lastPositions = new();
 
 	public void SetFiles(IReadOnlyList<FileAnalysis> files)
 	{
@@ -32,33 +40,54 @@ public sealed class FolderGridCityPlanner : ICityPlanner
 			.OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
 			.ToList();
 
-		// Build folder groups
-		this._folderToFiles.Clear();
-		foreach (string file in this._fileOrder)
+		this._lastPositions = new List<Vector3>(this._fileOrder.Count);
+		this._fileToFolder.Clear();
+
+		// Ensure folders are assigned stable outer slots
+		// Build ordered list of folders present in this call
+		List<string> foldersThisCall = this._fileOrder
+			.Select(GetFolderOf)
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+
+		foreach (string folder in foldersThisCall)
 		{
-			string folder = FolderGridCityPlanner.GetFolderOf(file);
-			if (!this._folderToFiles.TryGetValue(folder, out var list))
+			if (!this._folderAssignedIndex.TryGetValue(folder, out int slot))
 			{
-				list = new List<string>();
-				this._folderToFiles[folder] = list;
+				// Assign next outer slot
+				slot = this._folderAssignedIndex.Count;
+				this._folderAssignedIndex[folder] = slot;
+				this._folderPosition[folder] = ComputeSquareLayerPosition(slot, FolderGridCityPlanner.TowerSpacing * FolderGridCityPlanner.FolderSpacingMultiplier);
 			}
-			list.Add(file);
 		}
 
-		// Sort folders
-		this._folders = this._folderToFiles.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
-		this._folderIndex = this._folders.Select((f, i) => new { f, i }).ToDictionary(x => x.f, x => x.i, StringComparer.OrdinalIgnoreCase);
-
-		// Within each folder, sort files by name and record local index
-		this._fileLocalIndex.Clear();
-		foreach (string folder in this._folders)
+		// For each file, ensure it has a stable inner slot within its folder and compute absolute position
+		// Track how many files are already assigned per folder to append new ones
+		Dictionary<string, int> assignedCountPerFolder = new(StringComparer.OrdinalIgnoreCase);
+		foreach (var kv in this._fileAssignedLocalIndex)
 		{
-			List<string> list = this._folderToFiles[folder];
-			list.Sort(StringComparer.OrdinalIgnoreCase);
-			for (int i = 0; i < list.Count; i++)
+			string f = GetFolderOf(kv.Key);
+			assignedCountPerFolder[f] = Math.Max(assignedCountPerFolder.TryGetValue(f, out int c) ? c : 0, kv.Value + 1);
+		}
+
+		foreach (string file in this._fileOrder)
+		{
+			string folder = GetFolderOf(file);
+			this._fileToFolder[file] = folder;
+
+			if (!this._fileAssignedLocalIndex.TryGetValue(file, out int localSlot))
 			{
-				this._fileLocalIndex[list[i]] = i;
+				int countSoFar = assignedCountPerFolder.TryGetValue(folder, out int c) ? c : 0;
+				localSlot = countSoFar; // append within folder
+				this._fileAssignedLocalIndex[file] = localSlot;
+				assignedCountPerFolder[folder] = countSoFar + 1;
+				this._fileLocalPosition[file] = ComputeSquareLayerPosition(localSlot, FolderGridCityPlanner.TowerSpacing);
 			}
+			// Absolute position = outer folder position + inner file offset
+			Vector3 outer = this._folderPosition.TryGetValue(folder, out var op) ? op : Vector3.Zero;
+			Vector3 inner = this._fileLocalPosition.TryGetValue(file, out var ip) ? ip : Vector3.Zero;
+			this._lastPositions.Add(new Vector3(outer.X + inner.X, 0f, outer.Z + inner.Z));
 		}
 	}
 
@@ -68,47 +97,23 @@ public sealed class FolderGridCityPlanner : ICityPlanner
 		{
 			return Vector3.Zero;
 		}
-		if (index < 0 || index >= this._fileOrder.Count)
+		if (index < 0 || index >= this._lastPositions.Count)
 		{
-			index = Math.Clamp(index, 0, Math.Max(0, this._fileOrder.Count - 1));
+			return Vector3.Zero;
 		}
-
-		string file = this._fileOrder[index];
-		string folder = FolderGridCityPlanner.GetFolderOf(file);
-		int fIdx = this._folderIndex.TryGetValue(folder, out var fi) ? fi : 0;
-		int localIdx = this._fileLocalIndex.TryGetValue(file, out var li) ? li : 0;
-
-		// Outer (folders) grid placement
-		int folderCount = this._folders.Count;
-		int outerSize = (int)Math.Ceiling(Math.Sqrt(Math.Max(1, folderCount)));
-		int outerRow = fIdx / outerSize;
-		int outerCol = fIdx % outerSize;
-		float outerX = outerCol * TowerSpacing * FolderSpacingMultiplier;
-		float outerZ = outerRow * TowerSpacing * FolderSpacingMultiplier;
-
-		// Inner (files within folder) grid placement
-		int innerCount = this._folderToFiles.TryGetValue(folder, out var filesInFolder) ? filesInFolder.Count : 1;
-		int innerSize = (int)Math.Ceiling(Math.Sqrt(Math.Max(1, innerCount)));
-		int innerRow = localIdx / innerSize;
-		int innerCol = localIdx % innerSize;
-		float innerX = innerCol * TowerSpacing;
-		float innerZ = innerRow * TowerSpacing;
-
-		return new Vector3(outerX + innerX, 0f, outerZ + innerZ);
+		return this._lastPositions[index];
 	}
 
 	public (int rows, int cols, int gridSize) GetGrid()
 	{
-		// For legacy callers; return outer grid characteristics
-		int folderCount = this._folders.Count;
+		// Return a square bound that encloses all assigned folder positions.
+		int folderCount = this._folderAssignedIndex.Count;
 		if (folderCount <= 0)
 		{
 			return (0, 0, 0);
 		}
-		int gridSize = (int)Math.Ceiling(Math.Sqrt(folderCount));
-		int rows = (int)Math.Ceiling((float)folderCount / gridSize);
-		int cols = Math.Min(gridSize, folderCount);
-		return (rows, cols, gridSize);
+		int k = (int)Math.Ceiling(Math.Sqrt(folderCount));
+		return (k, k, k);
 	}
 
 	public (Vector3 position, Quaternion rotation) GetFullViewCameraPosition(Game game, CameraComponent camera)
@@ -160,6 +165,28 @@ public sealed class FolderGridCityPlanner : ICityPlanner
 		float appliedPitch = -Math.Abs(pitch);
 		Quaternion rotation = Quaternion.RotationYawPitchRoll(appliedYaw, appliedPitch, 0f);
 		return (position, rotation);
+	}
+
+	private static Vector3 ComputeSquareLayerPosition(int slot, float spacing)
+	{
+		// Square-layer growth pattern: expands in both axes without moving prior slots
+		int k = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(slot + 1))); // current square size
+		int prevSquare = (k - 1) * (k - 1);
+		int indexWithinLayer = slot - prevSquare;
+		int row, col;
+		if (indexWithinLayer < k)
+		{
+			// Fill the new rightmost column from top to bottom
+			row = indexWithinLayer;
+			col = k - 1;
+		}
+		else
+		{
+			// Then fill the new bottom row from left to right (excluding the overlapping corner)
+			row = k - 1;
+			col = indexWithinLayer - k;
+		}
+		return new Vector3(col * spacing, 0f, row * spacing);
 	}
 
 	private static string GetFolderOf(string file)

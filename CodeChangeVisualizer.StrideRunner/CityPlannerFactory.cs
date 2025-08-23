@@ -3,16 +3,16 @@
 public static class CityPlannerFactory
 {
 	/// <summary>
-	/// Creates a planner. If environment variable CCV_PLANNER is set to "folder"
-	/// (case-insensitive), returns FolderGridCityPlanner; otherwise GridCityPlanner.
+	/// Creates a planner. Defaults to FolderGridCityPlanner.
+	/// To use the legacy grid planner, set environment variable CCV_PLANNER to "grid" (case-insensitive).
 	/// </summary>
 	public static ICityPlanner CreateFromEnv()
 	{
 		string? mode = System.Environment.GetEnvironmentVariable("CCV_PLANNER");
-		if (!string.IsNullOrWhiteSpace(mode) && mode.Trim().Equals("folder", System.StringComparison.OrdinalIgnoreCase))
+		if (!string.IsNullOrWhiteSpace(mode) && mode.Trim().Equals("grid", System.StringComparison.OrdinalIgnoreCase))
 		{
-			return new FolderGridCityPlanner();
+			return new GridCityPlanner();
 		}
-		return new GridCityPlanner();
+		return new FolderGridCityPlanner();
 	}
 }
