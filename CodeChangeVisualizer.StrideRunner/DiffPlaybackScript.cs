@@ -182,13 +182,14 @@ public class DiffPlaybackScript : SyncScript
 			}
 
 			// Animate blocks for adds/modifies
-			// Update heights
+			// Update heights for blocks that will exist in the resulting state
 			foreach (BlockAnim b in tower.NewSequence)
 			{
 				b.CurrentHeight = MathUtil.Lerp(b.StartHeight, b.EndHeight, t);
 				this.ApplyBlockSize(b.Entity!, b.CurrentHeight);
 			}
 
+			// Update heights for blocks that will be removed (shrink to zero)
 			foreach (BlockAnim b in tower.Removed)
 			{
 				b.CurrentHeight = MathUtil.Lerp(b.StartHeight, 0f, t);
@@ -198,7 +199,7 @@ public class DiffPlaybackScript : SyncScript
 				}
 			}
 
-			// Recompute Y positions for new sequence (unchanged blocks move as neighbors change)
+			// Recompute Y positions for new sequence (target stack)
 			float currentY = 0f;
 			foreach (BlockAnim b in tower.NewSequence)
 			{
@@ -210,6 +211,22 @@ public class DiffPlaybackScript : SyncScript
 				float h = b.CurrentHeight;
 				b.Entity.Transform.Position = new Vector3(0f, currentY + h / 2f, 0f);
 				currentY += h;
+			}
+
+			// Recompute Y positions for old stack (only apply to removed blocks so they visibly shrink in place)
+			if (tower.OldSequence != null && tower.OldSequence.Count > 0 && tower.Removed.Count > 0)
+			{
+				var removedSet = new HashSet<BlockAnim>(tower.Removed);
+				float oldY = 0f;
+				foreach (BlockAnim b in tower.OldSequence)
+				{
+					float h = Math.Max(0f, b.CurrentHeight);
+					if (removedSet.Contains(b) && b.Entity != null)
+					{
+						b.Entity.Transform.Position = new Vector3(0f, oldY + h / 2f, 0f);
+					}
+					oldY += h;
+				}
 			}
 		}
 
@@ -464,11 +481,13 @@ public class DiffPlaybackScript : SyncScript
 						float startH = oldLines[iOld].Length * DiffPlaybackScript.UnitsPerLine;
 						if (ent != null)
 						{
-							removed.Add(new BlockAnim
-							{
-								Entity = ent, Color = DiffPlaybackScript.LineTypeColors[oldLines[iOld].Type],
-								StartHeight = startH, EndHeight = 0f, CurrentHeight = startH, IsNew = false
-							});
+ 						var remBlock = new BlockAnim
+ 						{
+ 							Entity = ent, Color = DiffPlaybackScript.LineTypeColors[oldLines[iOld].Type],
+ 							StartHeight = startH, EndHeight = 0f, CurrentHeight = startH, IsNew = false
+ 						};
+ 						removed.Add(remBlock);
+ 						towerAnim.OldSequence.Add(remBlock);
 						}
 
 						// Even if entity is missing, advance to keep indices consistent
@@ -517,11 +536,13 @@ public class DiffPlaybackScript : SyncScript
 							root.AddChild(ent);
 						}
 
-						newSeq.Add(new BlockAnim
+						var resized = new BlockAnim
 						{
 							Entity = ent, Color = DiffPlaybackScript.LineTypeColors[oldLines[iOld].Type],
 							StartHeight = startH, EndHeight = endH, CurrentHeight = startH, IsNew = false
-						});
+						};
+						newSeq.Add(resized);
+						towerAnim.OldSequence.Add(resized);
 						iOld++;
 						iOp++;
 						continue;
@@ -542,11 +563,13 @@ public class DiffPlaybackScript : SyncScript
 						root.AddChild(ent);
 					}
 
-					newSeq.Add(new BlockAnim
+					var passthrough = new BlockAnim
 					{
 						Entity = ent, Color = DiffPlaybackScript.LineTypeColors[oldLines[iOld].Type], StartHeight = h,
 						EndHeight = h, CurrentHeight = h, IsNew = false
-					});
+					};
+					newSeq.Add(passthrough);
+					towerAnim.OldSequence.Add(passthrough);
 					iOld++;
 					continue;
 				}
@@ -739,6 +762,7 @@ public class DiffPlaybackScript : SyncScript
 		public bool IsAdd;
 		public List<BlockAnim> NewSequence = new(); // blocks that exist in the resulting state
 		public List<BlockAnim> Removed = new(); // blocks that vanish
+		public List<BlockAnim> OldSequence = new(); // blocks in the original stack order (pre-step), includes removed and pass-through/resized
 		public FileAnalysis? TargetAnalysis; // resulting analysis for this tower after the step
 		public Vector3 StartRootPos; // for sinking
 	}
