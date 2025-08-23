@@ -80,8 +80,19 @@ public class HoverTooltipScript : SyncScript
 		}
 	}
 
+	private void RefreshBlocks()
+	{
+		// Rebuild block cache each frame to include newly added towers/blocks
+		this._blocks.Clear();
+		foreach (Entity entity in this.SceneSystem.SceneInstance?.RootScene.Entities ?? Enumerable.Empty<Entity>())
+		{
+			this.CollectBlocksRecursive(entity);
+		}
+	}
+
 	public override void Update()
 	{
+		this.RefreshBlocks();
 		if (this._camera == null || this._blocks.Count == 0)
 		{
 			return;
