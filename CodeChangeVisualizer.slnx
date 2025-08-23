@@ -16,4 +16,5 @@
     <Project Path="CodeChangeVisualizer.Runner/CodeChangeVisualizer.Runner.csproj"/>
     <Project Path="CodeChangeVisualizer.Tests/CodeChangeVisualizer.Tests.csproj"/>
     <Project Path="CodeChangeVisualizer.StrideRunner/CodeChangeVisualizer.StrideRunner.csproj"/>
+    <Project Path="CodeChangeVisualizer.StrideRunner.Tests/CodeChangeVisualizer.StrideRunner.Tests.csproj"/>
 </Solution>
