@@ -54,6 +54,8 @@ public class DiffPlaybackScript : SyncScript
 	private bool _animating;
 	private float _elapsed;
 	private StepAnimation? _currentStep;
+	// Autoplay flag: when true, we keep advancing steps automatically when not animating
+	private bool _autoPlay;
 
 	private class StepAnimation
 	{
@@ -114,6 +116,19 @@ public class DiffPlaybackScript : SyncScript
 			}
 			// Trigger next step on Space key
 			if (this.Input.IsKeyPressed(Keys.Space))
+			{
+				this.StartNextStep();
+			}
+			// Toggle autoplay with 'L' (play all remaining steps, sequentially)
+			if (this.Input.IsKeyPressed(Keys.L))
+			{
+				this._autoPlay = !this._autoPlay;
+				Console.WriteLine(this._autoPlay
+					? "[Playback] Autoplay ON (will advance with 2s per step)."
+					: "[Playback] Autoplay OFF.");
+			}
+			// If autoplay is enabled and not animating, attempt to start the next step
+			if (this._autoPlay)
 			{
 				this.StartNextStep();
 			}
@@ -277,11 +292,14 @@ public class DiffPlaybackScript : SyncScript
 		if (this.Diffs.Count == 0)
 		{
 			Console.WriteLine("[Playback] No diffs available.");
+			this._autoPlay = false;
 			return;
 		}
 		if (this._diffIndex >= this.Diffs.Count)
 		{
 			Console.WriteLine("[Playback] No more steps to play. Reached the end of the revision log.");
+			// Stop autoplay if it was active
+			this._autoPlay = false;
 			return;
 		}
 		Console.WriteLine($"[Playback] SPACE pressed: starting step {this._diffIndex + 1}/{this.Diffs.Count}");

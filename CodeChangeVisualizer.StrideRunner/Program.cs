@@ -182,7 +182,7 @@ internal class Program
 					};
 					diffEntity.Add(script);
 					rootScene.Entities.Add(diffEntity);
-					Console.WriteLine("Press SPACE to apply next diff (2s animation per step).");
+					Console.WriteLine("Press SPACE to apply next diff (2s per step). Press 'L' to autoplay remaining steps.");
 				}
 			}
 		});
