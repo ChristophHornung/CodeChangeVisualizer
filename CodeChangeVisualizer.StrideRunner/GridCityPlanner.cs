@@ -7,30 +7,64 @@ using Stride.Graphics;
 
 /// <summary>
 /// Default city planner: places towers on a square grid with equal spacing.
-/// Matches the previous layout logic used in SkyscraperVisualizer and DiffPlaybackScript.
-/// Ignores file details for now; keeps behavior unchanged.
+/// Now stable across SetFiles updates: existing towers never move; new towers are appended.
 /// </summary>
 public sealed class GridCityPlanner : ICityPlanner
 {
 	private const float TowerSpacing = LayoutCalculator.Constants.TowerSpacing;
 	private IReadOnlyList<FileAnalysis>? _files;
 
+	// Stability state
+	private readonly Dictionary<string, int> _assignedIndexByFile = new(StringComparer.OrdinalIgnoreCase);
+	private readonly Dictionary<string, Vector3> _positionByFile = new(StringComparer.OrdinalIgnoreCase);
+	private List<Vector3> _lastPositions = new(); // positions aligned with the latest SetFiles(files) order
+	private int _fixedCols = 0; // fixed number of columns chosen at the first non-empty SetFiles
+
 	public void SetFiles(IReadOnlyList<FileAnalysis> files)
 	{
 		this._files = files;
+		// Initialize fixed columns on the first non-empty call
+		if (this._fixedCols <= 0)
+		{
+			int count = files?.Count ?? 0;
+			if (count > 0)
+			{
+				this._fixedCols = System.Math.Max(1, (int)System.Math.Ceiling(System.Math.Sqrt(count)));
+			}
+		}
+
+		// Rebuild alignment for the provided files order while preserving positions for known files
+		this._lastPositions = new List<Vector3>(files?.Count ?? 0);
+		if (files == null)
+		{
+			return;
+		}
+
+		for (int i = 0; i < files.Count; i++)
+		{
+			string file = files[i].File;
+			if (!this._positionByFile.TryGetValue(file, out Vector3 pos))
+			{
+				// Assign a new slot index at the end (append) and compute its position using fixed columns
+				int slot = this._assignedIndexByFile.Count;
+				this._assignedIndexByFile[file] = slot;
+				int col = (this._fixedCols > 0) ? (slot % this._fixedCols) : slot; // if cols not set, fall back to row=0
+				int row = (this._fixedCols > 0) ? (slot / this._fixedCols) : 0;
+				pos = new Vector3(col * GridCityPlanner.TowerSpacing, 0f, row * GridCityPlanner.TowerSpacing);
+				this._positionByFile[file] = pos;
+			}
+			this._lastPositions.Add(pos);
+		}
 	}
 
 	public Vector3 GetPosition(int index)
 	{
-		if (index < 0) index = 0;
-		int totalCount = this._files?.Count ?? (index + 1);
-		if (totalCount < 1) totalCount = index + 1;
-		int gridSize = (int)System.Math.Ceiling(System.Math.Sqrt(totalCount));
-		int row = index / gridSize;
-		int col = index % gridSize;
-		float x = col * GridCityPlanner.TowerSpacing;
-		float z = row * GridCityPlanner.TowerSpacing;
-		return new Vector3(x, 0f, z);
+		if (index < 0 || index >= this._lastPositions.Count)
+		{
+			// Out of bounds: return origin to avoid exceptions
+			return Vector3.Zero;
+		}
+		return this._lastPositions[index];
 	}
 
 	public (int rows, int cols, int gridSize) GetGrid()
@@ -40,9 +74,9 @@ public sealed class GridCityPlanner : ICityPlanner
 		{
 			return (0, 0, 0);
 		}
-		int gridSize = (int)System.Math.Ceiling(System.Math.Sqrt(totalCount));
-		int rows = (int)System.Math.Ceiling((float)totalCount / gridSize);
-		int cols = System.Math.Min(gridSize, totalCount);
+		int cols = (this._fixedCols > 0) ? System.Math.Min(this._fixedCols, totalCount) : System.Math.Max(1, (int)System.Math.Ceiling(System.Math.Sqrt(totalCount)));
+		int rows = (int)System.Math.Ceiling((float)totalCount / cols);
+		int gridSize = System.Math.Max(cols, rows);
 		return (rows, cols, gridSize);
 	}
 
@@ -62,7 +96,7 @@ public sealed class GridCityPlanner : ICityPlanner
 			.Select(f => (f.Lines?.Sum(g => g.Length) ?? 0) * LayoutCalculator.Constants.UnitsPerLine)
 			.DefaultIfEmpty(0f).Max();
 
-		Console.WriteLine($"[CameraFit] count={count} gridSize={gridSize} rows={rows} cols={cols} width={width:F2} depth={depth:F2} maxHeight={maxHeight:F2}");
+		Console.WriteLine($"[CameraFit] count={count} cols={cols} rows={rows} width={width:F2} depth={depth:F2} maxHeight={maxHeight:F2}");
 
 		// Compute center and bounding sphere radius
 		Vector3 center = new Vector3(width / 2f, Math.Max(0.5f, maxHeight / 2f), depth / 2f);

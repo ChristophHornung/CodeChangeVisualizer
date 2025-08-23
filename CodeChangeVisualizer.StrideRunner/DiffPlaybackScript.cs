@@ -181,6 +181,13 @@ public class DiffPlaybackScript : SyncScript
 				continue;
 			}
 
+			// Animate tower root movement when layout changes
+			if (tower.Root != null && tower.MoveRoot)
+			{
+				Vector3 p = Vector3.Lerp(tower.StartRootPos, tower.EndRootPos, t);
+				tower.Root.Transform.Position = p;
+			}
+
 			// Animate blocks for adds/modifies
 			// Update heights for blocks that will exist in the resulting state
 			foreach (BlockAnim b in tower.NewSequence)
@@ -371,8 +378,37 @@ public class DiffPlaybackScript : SyncScript
 		Console.WriteLine($"[Playback] Step {this._diffIndex + 1}: {diff.Count} file change(s)");
 		this._diffIndex++;
 
+		// Compute current and future layouts to animate tower movements
+		var currentList = this._currentAnalyses.Values.OrderBy(f => f.File, StringComparer.OrdinalIgnoreCase).ToList();
+		var currentIndex = currentList.Select((f, i) => new { f.File, i }).ToDictionary(x => x.File, x => x.i, StringComparer.OrdinalIgnoreCase);
+		this._planner.SetFiles(currentList);
+		Dictionary<string, Vector3> currentPositions = currentList.ToDictionary(f => f.File, f => this._planner.GetPosition(currentIndex[f.File]), StringComparer.OrdinalIgnoreCase);
+		
+		// Apply diffs to get future list
+		Dictionary<string, FileAnalysis> futureMap = this._currentAnalyses.ToDictionary(kv => kv.Key, kv => new FileAnalysis { File = kv.Value.File, Lines = kv.Value.Lines.Select(g => new LineGroup { Type = g.Type, Length = g.Length, Start = g.Start }).ToList() }, StringComparer.OrdinalIgnoreCase);
+		foreach (var change in diff)
+		{
+			string file = change.File;
+			FileAnalysisDiff fad = change.Change;
+			futureMap.TryGetValue(file, out FileAnalysis? oldFa);
+			oldFa ??= new FileAnalysis { File = file, Lines = new List<LineGroup>() };
+			FileAnalysis patched = FileAnalysisApplier.Apply(oldFa, fad, file);
+			if (fad.Kind == FileAnalysisChangeKind.FileDelete)
+			{
+				futureMap.Remove(file);
+			}
+			else
+			{
+				futureMap[file] = patched;
+			}
+		}
+		var futureList = futureMap.Values.OrderBy(f => f.File, StringComparer.OrdinalIgnoreCase).ToList();
+		var futureIndex = futureList.Select((f, i) => new { f.File, i }).ToDictionary(x => x.File, x => x.i, StringComparer.OrdinalIgnoreCase);
+		this._planner.SetFiles(futureList);
+		Dictionary<string, Vector3> futurePositions = futureList.ToDictionary(f => f.File, f => this._planner.GetPosition(futureIndex[f.File]), StringComparer.OrdinalIgnoreCase);
+		
 		StepAnimation step = new StepAnimation();
-
+		
 		foreach (FileChangeEntry change in diff)
 		{
 			string file = change.File;
@@ -427,6 +463,13 @@ public class DiffPlaybackScript : SyncScript
 				this._towers[file] = root;
 				towerAnim.Root = root;
 				towerAnim.IsAdd = true;
+				// Place at future layout position
+				if (futurePositions.TryGetValue(file, out var endPos))
+				{
+					root.Transform.Position = endPos;
+					towerAnim.StartRootPos = endPos;
+					towerAnim.EndRootPos = endPos;
+				}
 
 				// Create blocks with base size equal to target and start height 0
 				foreach (LineGroup g in target.Lines)
@@ -453,6 +496,14 @@ public class DiffPlaybackScript : SyncScript
 
 			// Modify or add with existing root: we need to animate block-level changes
 			towerAnim.Root = root;
+			// Animate root movement if layout changed
+			Vector3 actualStart = root.Transform.Position;
+			towerAnim.StartRootPos = actualStart;
+			if (futurePositions.TryGetValue(file, out var endP))
+			{
+				towerAnim.EndRootPos = endP;
+				towerAnim.MoveRoot = (Vector3.DistanceSquared(actualStart, endP) > 1e-4f);
+			}
 
 			// Get current blocks/entities in order by Y
 			List<Entity> oldBlocks = root.Transform.Children.Select(c => c.Entity).Where(e => e != null)
@@ -611,6 +662,31 @@ public class DiffPlaybackScript : SyncScript
 			step.Towers.Add(towerAnim);
 		}
 
+		// Also add pure movement animations for towers not in diff but whose position changes
+		foreach (var kv in this._towers)
+		{
+			string file = kv.Key;
+			// Skip if this tower already has an entry in this step
+			if (step.Towers.Any(t => string.Equals(t.File, file, StringComparison.OrdinalIgnoreCase)))
+				continue;
+			if (!futurePositions.ContainsKey(file) || !currentPositions.ContainsKey(file))
+				continue;
+			Vector3 startP = kv.Value.Transform.Position; // actual current
+			Vector3 endP = futurePositions[file];
+			if (Vector3.DistanceSquared(startP, endP) > 1e-4f)
+			{
+				step.Towers.Add(new TowerAnim
+				{
+					File = file,
+					Root = kv.Value,
+					StartRootPos = startP,
+					EndRootPos = endP,
+					MoveRoot = true,
+					TargetAnalysis = this._currentAnalyses[file]
+				});
+			}
+		}
+
 		int addCount = step.Towers.Count(t => t.IsAdd);
 		int delCount = step.Towers.Count(t => t.IsDelete);
 		int modCount = step.Towers.Count - addCount - delCount;
@@ -622,7 +698,7 @@ public class DiffPlaybackScript : SyncScript
 		this._animating = true;
 	}
 
- private readonly ICityPlanner _planner = new GridCityPlanner();
+ private readonly ICityPlanner _planner = CityPlannerFactory.CreateFromEnv();
 
  private Entity CreateTowerRoot(string file, int index)
  {
@@ -762,18 +838,20 @@ public class DiffPlaybackScript : SyncScript
 		public List<TowerAnim> Towers = new();
 	}
 
-	private class TowerAnim
-	{
-		public string File = string.Empty;
-		public Entity? Root; // may be null for newly added until created
-		public bool IsDelete;
-		public bool IsAdd;
-		public List<BlockAnim> NewSequence = new(); // blocks that exist in the resulting state
-		public List<BlockAnim> Removed = new(); // blocks that vanish
-		public List<BlockAnim> OldSequence = new(); // blocks in the original stack order (pre-step), includes removed and pass-through/resized
-		public FileAnalysis? TargetAnalysis; // resulting analysis for this tower after the step
-		public Vector3 StartRootPos; // for sinking
-	}
+		private class TowerAnim
+		{
+			public string File = string.Empty;
+			public Entity? Root; // may be null for newly added until created
+			public bool IsDelete;
+			public bool IsAdd;
+			public bool MoveRoot; // when true, lerp Root from StartRootPos to EndRootPos
+			public List<BlockAnim> NewSequence = new(); // blocks that exist in the resulting state
+			public List<BlockAnim> Removed = new(); // blocks that vanish
+			public List<BlockAnim> OldSequence = new(); // blocks in the original stack order (pre-step), includes removed and pass-through/resized
+			public FileAnalysis? TargetAnalysis; // resulting analysis for this tower after the step
+			public Vector3 StartRootPos; // for sinking / movement
+			public Vector3 EndRootPos; // for movement
+		}
 
 	private class BlockAnim
 	{

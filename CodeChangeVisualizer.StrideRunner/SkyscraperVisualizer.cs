@@ -143,7 +143,7 @@ public class SkyscraperVisualizer
 			return;
 		}
 		
-		ICityPlanner planner = new GridCityPlanner();
+		ICityPlanner planner = CityPlannerFactory.CreateFromEnv();
 		planner.SetFiles(analysis);
 		int index = 0;
 		foreach (FileAnalysis file in analysis)
@@ -169,7 +169,7 @@ public class SkyscraperVisualizer
 			return;
 		}
 		
-		ICityPlanner planner = new GridCityPlanner();
+		ICityPlanner planner = CityPlannerFactory.CreateFromEnv();
 		planner.SetFiles(analysis);
 		
 		// Find a camera in the scene (search recursively)
