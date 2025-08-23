@@ -47,6 +47,7 @@ public class DiffPlaybackScript : SyncScript
 	private readonly Dictionary<string, FileAnalysis> _currentAnalyses = new(StringComparer.OrdinalIgnoreCase);
 	private readonly Dictionary<string, Entity> _towers = new(StringComparer.OrdinalIgnoreCase);
 	private int _nextGridIndex;
+	private int _diffIndex; // index of the next diff step to play (we do not mutate Diffs)
 
 	// Animation state per step
 	private bool _animating;
@@ -96,6 +97,7 @@ public class DiffPlaybackScript : SyncScript
 		}
 
 		this._nextGridIndex = this._towers.Count; // append for newly added towers
+		this._diffIndex = 0; // start from the first diff step
 	}
 
 	public override void Update()
@@ -104,6 +106,11 @@ public class DiffPlaybackScript : SyncScript
 
 		if (!this._animating)
 		{
+			// Reset to first visualization on 'R'
+			if (this.Input.IsKeyPressed(Keys.R))
+			{
+				this.ResetToInitialVisualization();
+			}
 			// Trigger next step on Space key
 			if (this.Input.IsKeyPressed(Keys.Space))
 			{
@@ -218,11 +225,62 @@ public class DiffPlaybackScript : SyncScript
 		}
 	}
 
+	private void ResetToInitialVisualization()
+	{
+		// Stop any ongoing animation
+		this._animating = false;
+		this._elapsed = 0f;
+		this._currentStep = null;
+
+		// Remove all current tower entities from the scene
+		var rootEntities = this.SceneSystem.SceneInstance?.RootScene.Entities;
+		if (rootEntities != null)
+		{
+			foreach (var kv in this._towers.ToList())
+			{
+				if (kv.Value != null)
+				{
+					rootEntities.Remove(kv.Value);
+				}
+			}
+		}
+
+		// Clear runtime maps
+		this._towers.Clear();
+		this._currentAnalyses.Clear();
+
+		// Reset playback to the beginning and rebuild the towers using the same layout logic as creation
+		this._diffIndex = 0;
+
+		// Rebuild the towers using the same layout logic as creation
+		int index = 0;
+		foreach (var file in this.InitialAnalysis)
+		{
+			Entity fileRoot = this.CreateTowerRoot(file.File, index);
+			rootEntities?.Add(fileRoot);
+			this._towers[file.File] = fileRoot;
+			this._currentAnalyses[file.File] = new FileAnalysis { File = file.File, Lines = file.Lines.Select(g => new LineGroup { Type = g.Type, Length = g.Length, Start = g.Start }).ToList() };
+
+			// Build blocks
+			float currentY = 0f;
+			foreach (var group in file.Lines)
+			{
+				var block = this.CreateBlock(file.File, group, currentY);
+				fileRoot.AddChild(block);
+				currentY += group.Length * DiffPlaybackScript.UnitsPerLine;
+			}
+			index++;
+		}
+
+		this._nextGridIndex = this._towers.Count;
+	}
+
 	private void StartNextStep()
 	{
 		if (this.Diffs.Count == 0) return;
-		List<FileChangeEntry> diff = this.Diffs[0];
-		this.Diffs.RemoveAt(0);
+		if (this._diffIndex >= this.Diffs.Count) return;
+		List<FileChangeEntry> diff = this.Diffs[this._diffIndex];
+		this._diffIndex++;
 
 		StepAnimation step = new StepAnimation();
 
@@ -534,5 +592,5 @@ public class DiffPlaybackScript : SyncScript
 		{
 			materials.Add(new KeyValuePair<int, Material>(0, material));
 		}
-	}
+ }
 }
