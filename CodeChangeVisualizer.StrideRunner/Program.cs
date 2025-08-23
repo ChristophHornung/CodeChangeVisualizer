@@ -104,7 +104,7 @@ internal class Program
 						}
 					} // end foreach file change
 				} // end for each revision
-				analysis = files.Values.OrderBy(f => f.File, StringComparer.OrdinalIgnoreCase).ToList();
+				analysis = revs[0].Analysis.OrderBy(f => f.File, StringComparer.OrdinalIgnoreCase).ToList();
 			}
 			else
 			{
