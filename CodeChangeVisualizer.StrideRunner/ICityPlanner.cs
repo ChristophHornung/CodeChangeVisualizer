@@ -2,6 +2,7 @@
 
 using CodeChangeVisualizer.Analyzer;
 using Stride.Core.Mathematics;
+using Stride.Engine;
 
 /// <summary>
 /// Defines an abstraction for planning the layout of skyscraper towers (city blocks).
@@ -23,8 +24,11 @@ public interface ICityPlanner
     Vector3 GetPosition(int index);
 
     /// <summary>
-    /// Computes the grid characteristics for the current files.
+    /// Computes a camera position and rotation that frames all towers/files currently set via SetFiles.
+    /// This encapsulates the width/depth/height, FOV, and aspect calculations used to initially position the camera.
     /// </summary>
-    /// <returns>Tuple of (rows, cols, gridSize), where gridSize is the base grid dimension (ceil(sqrt(totalCount))).</returns>
-    (int rows, int cols, int gridSize) GetGrid();
+    /// <param name="game">Stride Game instance used to query back buffer for aspect ratio.</param>
+    /// <param name="camera">Camera component whose FOV will be used for framing.</param>
+    /// <returns>A tuple of (position, rotation) for the camera.</returns>
+    (Vector3 position, Quaternion rotation) GetFullViewCameraPosition(Game game, CameraComponent camera);
 }
