@@ -17,12 +17,23 @@ public static class GitHistoryAnalyzer
 	/// <param name="ignorePatterns">Optional regex patterns to ignore files (relative paths from workingDirectory).</param>
 	/// <param name="fileExtensions">Optional file extensions (globs) to include. Defaults to *.cs if null or empty.</param>
 	/// <returns>The computed <see cref="RevisionLog"/>.</returns>
+	/// <exception cref="ArgumentNullException">Thrown when workingDirectory or gitStart is null.</exception>
+	/// <exception cref="ArgumentException">Thrown when workingDirectory or gitStart is empty or whitespace.</exception>
+	/// <exception cref="InvalidOperationException">Thrown when git operations fail or working tree is not clean.</exception>
 	public static async Task<RevisionLog> RunAdvancedGitAnalysisAsync(
 		string workingDirectory,
 		string gitStart,
 		List<string>? ignorePatterns = null,
 		List<string>? fileExtensions = null)
 	{
+		ArgumentNullException.ThrowIfNull(workingDirectory);
+		ArgumentNullException.ThrowIfNull(gitStart);
+		
+		if (string.IsNullOrWhiteSpace(workingDirectory))
+			throw new ArgumentException("Working directory cannot be empty or whitespace.", nameof(workingDirectory));
+		if (string.IsNullOrWhiteSpace(gitStart))
+			throw new ArgumentException("Git start reference cannot be empty or whitespace.", nameof(gitStart));
+
 		IGitClient git = new GitCliClient();
 		return await GitHistoryAnalyzer.RunAdvancedGitAnalysisAsync(git, workingDirectory, gitStart, ignorePatterns,
 			fileExtensions);
@@ -31,6 +42,15 @@ public static class GitHistoryAnalyzer
 	/// <summary>
 	/// Overload that accepts a custom IGitClient (for testing or alternate implementations).
 	/// </summary>
+	/// <param name="git">The git client to use for operations.</param>
+	/// <param name="workingDirectory">The repository subdirectory to analyze.</param>
+	/// <param name="gitStart">The starting commit hash or ref to include as the first revision.</param>
+	/// <param name="ignorePatterns">Optional regex patterns to ignore files.</param>
+	/// <param name="fileExtensions">Optional file extensions (globs) to include.</param>
+	/// <returns>The computed <see cref="RevisionLog"/>.</returns>
+	/// <exception cref="ArgumentNullException">Thrown when any required parameter is null.</exception>
+	/// <exception cref="ArgumentException">Thrown when workingDirectory or gitStart is empty or whitespace.</exception>
+	/// <exception cref="InvalidOperationException">Thrown when git operations fail or working tree is not clean.</exception>
 	public static async Task<RevisionLog> RunAdvancedGitAnalysisAsync(
 		IGitClient git,
 		string workingDirectory,
@@ -38,6 +58,15 @@ public static class GitHistoryAnalyzer
 		List<string>? ignorePatterns = null,
 		List<string>? fileExtensions = null)
 	{
+		ArgumentNullException.ThrowIfNull(git);
+		ArgumentNullException.ThrowIfNull(workingDirectory);
+		ArgumentNullException.ThrowIfNull(gitStart);
+		
+		if (string.IsNullOrWhiteSpace(workingDirectory))
+			throw new ArgumentException("Working directory cannot be empty or whitespace.", nameof(workingDirectory));
+		if (string.IsNullOrWhiteSpace(gitStart))
+			throw new ArgumentException("Git start reference cannot be empty or whitespace.", nameof(gitStart));
+
 		string workDir = Path.GetFullPath(workingDirectory);
 
 		// Ensure clean working directory (safety)
@@ -55,13 +84,21 @@ public static class GitHistoryAnalyzer
 		}
 
 		string headSha = await git.GetHeadShaAsync(workDir);
+		if (string.IsNullOrWhiteSpace(headSha))
+		{
+			throw new InvalidOperationException("Cannot resolve HEAD commit.");
+		}
+
 		List<string> commits = await git.GetCommitsRangeAsync(workDir, startSha, headSha);
+		if (commits.Count == 0)
+		{
+			throw new InvalidOperationException($"No commits found between '{startSha}' and '{headSha}'.");
+		}
 
 		RevisionLog log = new RevisionLog();
 
 		// Normalize filters
-		List<string>?
-			exts = (fileExtensions != null && fileExtensions.Count > 0) ? fileExtensions : ["*.cs"]; // default
+		List<string> exts = (fileExtensions != null && fileExtensions.Count > 0) ? fileExtensions : ["*.cs"]; // default
 		List<string>? ignores = (ignorePatterns != null && ignorePatterns.Count > 0) ? ignorePatterns : null;
 
 		// Snapshot map of previous commit analyses for incremental diffs
@@ -78,12 +115,21 @@ public static class GitHistoryAnalyzer
 				List<string> allFiles = await git.ListFilesAtCommitAsync(workDir, sha);
 				List<string> filesToAnalyze = GitHistoryAnalyzer.FilterByExtensionsAndIgnores(allFiles, exts, ignores);
 				List<FileAnalysis> current = new List<FileAnalysis>(filesToAnalyze.Count);
+				
 				foreach (string repoPath in filesToAnalyze)
 				{
-					using Stream stream = await git.OpenFileAsync(workDir, sha, repoPath);
-					FileAnalysis fa = await analyzer.AnalyzeFileAsync(stream, repoPath);
-					fa.File = repoPath.Replace('\\', '/');
-					current.Add(fa);
+					try
+					{
+						using Stream stream = await git.OpenFileAsync(workDir, sha, repoPath);
+						FileAnalysis fa = await analyzer.AnalyzeFileAsync(stream, repoPath);
+						fa.File = repoPath.Replace('\\', '/');
+						current.Add(fa);
+					}
+					catch (Exception ex)
+					{
+						// Log the error but continue with other files
+						Console.WriteLine($"Warning: Failed to analyze file '{repoPath}' at commit '{sha}': {ex.Message}");
+					}
 				}
 
 				// Deterministic ordering
@@ -95,6 +141,7 @@ public static class GitHistoryAnalyzer
 			{
 				string prevSha = commits[idx - 1];
 				List<GitChange> rawChanges = await git.GetChangesAsync(workDir, prevSha, sha);
+				
 				// Expand renames into delete+add to keep downstream simple
 				List<GitChange> changes = new();
 				foreach (var ch in rawChanges)
@@ -130,14 +177,24 @@ public static class GitHistoryAnalyzer
 
 					prevMap.TryGetValue(path, out FileAnalysis? oldFa);
 					FileAnalysis newFa;
+					
 					if (lastKind == GitChangeKind.Delete)
 					{
 						newFa = new FileAnalysis { File = path, Lines = new List<LineGroup>() };
 					}
 					else
 					{
-						using Stream stream = await git.OpenFileAsync(workDir, sha, path);
-						newFa = await analyzer.AnalyzeFileAsync(stream, path);
+						try
+						{
+							using Stream stream = await git.OpenFileAsync(workDir, sha, path);
+							newFa = await analyzer.AnalyzeFileAsync(stream, path);
+						}
+						catch (Exception ex)
+						{
+							// Log the error but continue with other files
+							Console.WriteLine($"Warning: Failed to analyze file '{path}' at commit '{sha}': {ex.Message}");
+							continue;
+						}
 					}
 
 					oldFa ??= new FileAnalysis { File = path, Lines = new List<LineGroup>() };
@@ -171,8 +228,17 @@ public static class GitHistoryAnalyzer
 		return log;
 	}
 
+	/// <summary>
+	/// Computes the difference between two sets of file analyses.
+	/// </summary>
+	/// <param name="oldAnalyses">The previous file analyses.</param>
+	/// <param name="newAnalyses">The current file analyses.</param>
+	/// <returns>A list of file change entries representing the differences.</returns>
 	private static List<FileChangeEntry> ComputeDiff(List<FileAnalysis> oldAnalyses, List<FileAnalysis> newAnalyses)
 	{
+		ArgumentNullException.ThrowIfNull(oldAnalyses);
+		ArgumentNullException.ThrowIfNull(newAnalyses);
+
 		List<FileChangeEntry> result = new List<FileChangeEntry>();
 		Dictionary<string, FileAnalysis> oldMap = oldAnalyses.ToDictionary(f => f.File, f => f);
 		Dictionary<string, FileAnalysis> newMap = newAnalyses.ToDictionary(f => f.File, f => f);
@@ -212,9 +278,18 @@ public static class GitHistoryAnalyzer
 		return result.OrderBy(e => e.File, StringComparer.OrdinalIgnoreCase).ToList();
 	}
 
+	/// <summary>
+	/// Filters a list of file paths based on extension patterns and ignore patterns.
+	/// </summary>
+	/// <param name="paths">The list of file paths to filter.</param>
+	/// <param name="fileExtensions">Optional file extension patterns (e.g., "*.cs").</param>
+	/// <param name="ignorePatterns">Optional regex patterns to ignore files.</param>
+	/// <returns>The filtered list of file paths.</returns>
 	private static List<string> FilterByExtensionsAndIgnores(List<string> paths, List<string>? fileExtensions,
 		List<string>? ignorePatterns)
 	{
+		ArgumentNullException.ThrowIfNull(paths);
+
 		// Normalize to forward slashes
 		IEnumerable<string> seq = paths.Select(p => p.Replace('\\', '/'));
 
@@ -228,9 +303,10 @@ public static class GitHistoryAnalyzer
 				{
 					regs.Add(new Regex(pat, RegexOptions.IgnoreCase));
 				}
-				catch
+				catch (ArgumentException ex)
 				{
-					/* skip invalid regex */
+					// Log invalid regex patterns but continue
+					Console.WriteLine($"Warning: Invalid ignore pattern '{pat}': {ex.Message}");
 				}
 			}
 
@@ -258,13 +334,30 @@ public static class GitHistoryAnalyzer
 		return seq.ToList();
 	}
 
+	/// <summary>
+	/// Checks if a filename matches a glob pattern.
+	/// </summary>
+	/// <param name="input">The filename to check.</param>
+	/// <param name="pattern">The glob pattern to match against.</param>
+	/// <returns>True if the filename matches the pattern, false otherwise.</returns>
 	private static bool GlobIsMatch(string input, string pattern)
 	{
-		// Translate glob to regex: escape regex chars, then replace \* -> .*, \? -> .
-		string escaped = Regex.Escape(pattern)
-			.Replace("\\*", ".*")
-			.Replace("\\?", ".");
-		string regex = "^" + escaped + "$";
-		return Regex.IsMatch(input, regex, RegexOptions.IgnoreCase);
+		ArgumentNullException.ThrowIfNull(input);
+		ArgumentNullException.ThrowIfNull(pattern);
+
+		try
+		{
+			// Translate glob to regex: escape regex chars, then replace \* -> .*, \? -> .
+			string escaped = Regex.Escape(pattern)
+				.Replace("\\*", ".*")
+				.Replace("\\?", ".");
+			string regex = "^" + escaped + "$";
+			return Regex.IsMatch(input, regex, RegexOptions.IgnoreCase);
+		}
+		catch (ArgumentException)
+		{
+			// Return false for invalid patterns
+			return false;
+		}
 	}
 }
