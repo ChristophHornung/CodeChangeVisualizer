@@ -51,8 +51,14 @@ public class CodeAnalyzer
 	public async Task<FileAnalysis> AnalyzeFileAsync(Stream stream, string relativePath)
 	{
 		using StreamReader reader = new(stream);
-		string[] lines = (await reader.ReadToEndAsync()).Split([Environment.NewLine], StringSplitOptions.None);
-		return await this.AnalyzeFileAsync(relativePath, lines);
+		List<string> lines = new List<string>();
+		string? line;
+		while ((line = await reader.ReadLineAsync()) != null)
+		{
+			lines.Add(line);
+		}
+
+		return await this.AnalyzeFileAsync(relativePath, lines.ToArray());
 	}
 
 	/// <summary>
