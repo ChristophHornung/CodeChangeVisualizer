@@ -223,13 +223,13 @@ internal class Program
 		const float GroundSize = 100000f; // 100 km square, effectively infinite for our layouts
 		const float GroundThickness = 0.1f;
 		const float GroundScaleIfExists = 100f; // upscale existing ground to ensure huge effective size
-
+		
 		// Try to find an existing ground entity by name
 		Entity? ground = rootScene.Entities
 			.FirstOrDefault(e => !string.IsNullOrEmpty(e.Name)
 			                    && e.Name.IndexOf("ground", StringComparison.OrdinalIgnoreCase) >= 0
 			                    && e.Get<ModelComponent>() != null);
-
+		
 		if (ground == null)
 		{
 			// Create a very large, thin cube as ground so its top sits at Y=0
@@ -248,10 +248,8 @@ internal class Program
 			{
 				ground.Transform.Scale = new Vector3(GroundScaleIfExists, 1f, GroundScaleIfExists);
 			}
-			// Ensure it sits at Y=0 (top surface)
-			ground.Transform.Position = new Vector3(ground.Transform.Position.X, -GroundThickness / 2f, ground.Transform.Position.Z);
 		}
-
+		
 		// Apply a grass-green material to the ground
 		ModelComponent? mc = ground.Get<ModelComponent>();
 		if (mc != null && game.GraphicsDevice != null)
