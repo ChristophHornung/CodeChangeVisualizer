@@ -209,7 +209,7 @@ public class SkyscraperVisualizer
 
 		foreach (LineGroup group in file.Lines)
 		{
-			float height = group.Length * SkyscraperVisualizer.UnitsPerLine;
+			float height = LayoutCalculator.ComputeBlockHeight(group.Length);
 			Entity block = this.CreateBlock(file, group, currentY, game);
 			fileRoot.AddChild(block);
 			currentY += height; // Move up for the next block
@@ -223,18 +223,19 @@ public class SkyscraperVisualizer
 	/// </summary>
 	private Entity CreateBlock(FileAnalysis file, LineGroup group, float currentY, Game game)
 	{
-		float height = group.Length * SkyscraperVisualizer.UnitsPerLine;
-		Color4 color = SkyscraperVisualizer.LineTypeColors[group.Type];
+ 	float height = LayoutCalculator.ComputeBlockHeight(group.Length);
+ 	Color4 color = SkyscraperVisualizer.LineTypeColors[group.Type];
 
-		// Create an entity that reuses a shared unit-cube model and scale it to desired size
-		Entity cube = new Entity(file.File);
-		if (SkyscraperVisualizer.s_UnitCubeModel != null)
-		{
-			cube.Add(new ModelComponent { Model = SkyscraperVisualizer.s_UnitCubeModel });
-		}
+ 	// Create an entity that reuses a shared unit-cube model and scale it to desired size
+ 	Entity cube = new Entity(file.File);
+ 	if (SkyscraperVisualizer.s_UnitCubeModel != null)
+ 	{
+ 		cube.Add(new ModelComponent { Model = SkyscraperVisualizer.s_UnitCubeModel });
+ 	}
 
-		cube.Transform.Position = new Vector3(0f, currentY + height / 2, 0f);
-		cube.Transform.Scale = new Vector3(SkyscraperVisualizer.BlockWidth, height, SkyscraperVisualizer.BlockDepth);
+ 	// Position so the base sits at currentY (cube is centered, so add half-height)
+ 	cube.Transform.Position = new Vector3(0f, LayoutCalculator.ComputeBlockCenterY(currentY, height), 0f);
+ 	cube.Transform.Scale = new Vector3(SkyscraperVisualizer.BlockWidth, height, SkyscraperVisualizer.BlockDepth);
 
 		// Apply material color directly so it renders with the intended color
 		this.ApplyColorToCube(game, cube, color);
@@ -245,7 +246,7 @@ public class SkyscraperVisualizer
 			Size = new Vector3(SkyscraperVisualizer.BlockWidth, height, SkyscraperVisualizer.BlockDepth), Color = color
 		});
 
-		Console.WriteLine($"  Added block: {cube.Name} at Y={currentY + height / 2}, height={height}, color={color}");
+  Console.WriteLine($"  Added block: {cube.Name} at Y={LayoutCalculator.ComputeBlockCenterY(currentY, height)}, height={height}, color={color}");
 
 		return cube;
 	}

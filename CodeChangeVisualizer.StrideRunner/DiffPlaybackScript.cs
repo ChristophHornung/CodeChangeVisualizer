@@ -349,7 +349,7 @@ public class DiffPlaybackScript : SyncScript
 			{
 				var block = this.CreateBlock(file.File, group, currentY);
 				fileRoot.AddChild(block);
-				currentY += group.Length * DiffPlaybackScript.UnitsPerLine;
+    currentY += LayoutCalculator.ComputeBlockHeight(group.Length);
 			}
 		}
 		
@@ -474,7 +474,7 @@ public class DiffPlaybackScript : SyncScript
 				// Create blocks with base size equal to target and start height 0
 				foreach (LineGroup g in target.Lines)
 				{
-					float endH = g.Length * DiffPlaybackScript.UnitsPerLine;
+     float endH = LayoutCalculator.ComputeBlockHeight(g.Length);
 					Entity block = this.CreateBlock(file, g, 0f);
 					// Initialize with scale 0 (we will grow to 1)
 					this.ApplyBlockSize(block, 0f, endH);
@@ -531,7 +531,7 @@ public class DiffPlaybackScript : SyncScript
 					{
 						// mark old block to shrink to zero (if entity exists)
 						Entity? ent = iOld < oldBlocks.Count ? oldBlocks[iOld] : null;
-						float startH = oldLines[iOld].Length * DiffPlaybackScript.UnitsPerLine;
+						float startH = LayoutCalculator.ComputeBlockHeight(oldLines[iOld].Length);
 						if (ent != null)
 						{
  						var remBlock = new BlockAnim
@@ -562,7 +562,7 @@ public class DiffPlaybackScript : SyncScript
 							g = new LineGroup { Type = op.LineType, Length = op.NewLength ?? 0, Start = 0 };
 						}
 
-						float endH = (op.NewLength ?? g.Length) * DiffPlaybackScript.UnitsPerLine;
+      float endH = LayoutCalculator.ComputeBlockHeight(op.NewLength ?? g.Length);
 						Entity block = this.CreateBlock(file, g, 0f);
 						this.ApplyBlockSize(block, 0f, endH);
 						root.AddChild(block);
@@ -578,8 +578,8 @@ public class DiffPlaybackScript : SyncScript
 					if (op.Kind == DiffOpType.Resize && op.Index == newSeq.Count && iOld < oldLines.Count)
 					{
 						Entity? ent = iOld < oldBlocks.Count ? oldBlocks[iOld] : null;
-						float startH = oldLines[iOld].Length * DiffPlaybackScript.UnitsPerLine;
-						float endH = (op.NewLength ?? oldLines[iOld].Length) * DiffPlaybackScript.UnitsPerLine;
+      float startH = LayoutCalculator.ComputeBlockHeight(oldLines[iOld].Length);
+      float endH = LayoutCalculator.ComputeBlockHeight(op.NewLength ?? oldLines[iOld].Length);
 						if (ent == null)
 						{
 							// if missing entity, create one to animate resize correctly
@@ -606,7 +606,7 @@ public class DiffPlaybackScript : SyncScript
 				{
 					// passthrough unchanged block
 					Entity? ent = iOld < oldBlocks.Count ? oldBlocks[iOld] : null;
-					float h = oldLines[iOld].Length * DiffPlaybackScript.UnitsPerLine;
+     float h = LayoutCalculator.ComputeBlockHeight(oldLines[iOld].Length);
 					if (ent == null)
 					{
 						// recreate missing entity
@@ -641,7 +641,7 @@ public class DiffPlaybackScript : SyncScript
 						g = new LineGroup { Type = op.LineType, Length = op.NewLength ?? 0, Start = 0 };
 					}
 
-					float endH = (op.NewLength ?? g.Length) * DiffPlaybackScript.UnitsPerLine;
+     float endH = LayoutCalculator.ComputeBlockHeight(op.NewLength ?? g.Length);
 					Entity block = this.CreateBlock(file, g, 0f);
 					this.ApplyBlockSize(block, 0f, endH);
 					root.AddChild(block);
@@ -759,7 +759,7 @@ public class DiffPlaybackScript : SyncScript
 
 	private Entity CreateBlock(string file, LineGroup group, float currentY)
 	{
-		float height = group.Length * DiffPlaybackScript.UnitsPerLine;
+  float height = LayoutCalculator.ComputeBlockHeight(group.Length);
 		Color4 color = DiffPlaybackScript.LineTypeColors[group.Type];
 
 		// Ensure we have a template model to attach to new blocks, even if scene started empty
@@ -771,7 +771,10 @@ public class DiffPlaybackScript : SyncScript
 			cube.Add(new ModelComponent { Model = this._templateModel });
 		}
 
+		// Position so the base sits at currentY (cube is centered, so add half-height)
 		cube.Transform.Position = new Vector3(0f, currentY + height / 2f, 0f);
+		// Scale to the intended block size so it visually matches SkyscraperVisualizer
+		cube.Transform.Scale = new Vector3(DiffPlaybackScript.BlockWidth, height, DiffPlaybackScript.BlockDepth);
 		cube.Add(new BlockDescriptorComponent
 		{
 			Size = new Vector3(DiffPlaybackScript.BlockWidth, height, DiffPlaybackScript.BlockDepth), Color = color

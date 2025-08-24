@@ -5,7 +5,13 @@ using CodeChangeVisualizer.Analyzer;
 using Stride.CommunityToolkit.Bepu;
 using Stride.CommunityToolkit.Engine;
 using Stride.CommunityToolkit.Skyboxes;
+using Stride.CommunityToolkit.Rendering.ProceduralModels;
+using Stride.Core.Mathematics;
 using Stride.Engine;
+using Stride.Graphics;
+using Stride.Rendering;
+using Stride.Rendering.Materials;
+using Stride.Rendering.Materials.ComputeColors;
 
 internal class Program
 {
@@ -171,6 +177,9 @@ internal class Program
 			game.SetupBase3DScene();
 			game.AddSkybox();
 
+			// Ensure a grass-green ground at Y=0
+			Program.EnsureGrassGround(rootScene, game);
+
 			// Create the skyscraper visualizer
 			SkyscraperVisualizer visualizer = new SkyscraperVisualizer();
 
@@ -206,6 +215,67 @@ internal class Program
 				}
 			}
 		});
+	}
+
+	private static void EnsureGrassGround(Scene rootScene, Game game)
+	{
+		// We want an effectively infinite ground plane. We'll use a very large size and/or scale.
+		const float GroundSize = 100000f; // 100 km square, effectively infinite for our layouts
+		const float GroundThickness = 0.1f;
+		const float GroundScaleIfExists = 100f; // upscale existing ground to ensure huge effective size
+
+		// Try to find an existing ground entity by name
+		Entity? ground = rootScene.Entities
+			.FirstOrDefault(e => !string.IsNullOrEmpty(e.Name)
+			                    && e.Name.IndexOf("ground", StringComparison.OrdinalIgnoreCase) >= 0
+			                    && e.Get<ModelComponent>() != null);
+
+		if (ground == null)
+		{
+			// Create a very large, thin cube as ground so its top sits at Y=0
+			var options = new Primitive3DCreationOptions { Size = new Vector3(GroundSize, GroundThickness, GroundSize), IncludeCollider = false };
+			Entity plane = game.Create3DPrimitive(PrimitiveModelType.Cube, options);
+			plane.Name = "Ground";
+			plane.Transform.Position = new Vector3(0f, -GroundThickness / 2f, 0f);
+			ground = plane;
+			rootScene.Entities.Add(ground);
+		}
+		else
+		{
+			// Ensure existing ground is scaled up massively to appear infinite
+			Vector3 s = ground.Transform.Scale;
+			if (s.X < GroundScaleIfExists || s.Z < GroundScaleIfExists)
+			{
+				ground.Transform.Scale = new Vector3(GroundScaleIfExists, 1f, GroundScaleIfExists);
+			}
+			// Ensure it sits at Y=0 (top surface)
+			ground.Transform.Position = new Vector3(ground.Transform.Position.X, -GroundThickness / 2f, ground.Transform.Position.Z);
+		}
+
+		// Apply a grass-green material to the ground
+		ModelComponent? mc = ground.Get<ModelComponent>();
+		if (mc != null && game.GraphicsDevice != null)
+		{
+			var green = new Color4(0.2f, 0.6f, 0.2f, 1f);
+			MaterialDescriptor desc = new MaterialDescriptor
+			{
+				Attributes = new MaterialAttributes
+				{
+					Diffuse = new MaterialDiffuseMapFeature(new ComputeColor(green)),
+					DiffuseModel = new MaterialDiffuseLambertModelFeature(),
+				}
+			};
+			Material mat = Material.New(game.GraphicsDevice, desc);
+			var materials = mc.Materials;
+			if (materials.Count > 0)
+			{
+				materials[0] = mat;
+			}
+			else
+			{
+				materials.Add(new KeyValuePair<int, Material>(0, mat));
+			}
+		}
 	}
 
 	private static string? GetDefaultAnalysisJsonPath()

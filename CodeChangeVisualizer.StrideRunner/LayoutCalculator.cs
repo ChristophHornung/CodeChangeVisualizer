@@ -25,6 +25,23 @@ public static class LayoutCalculator
 	}
 
 	/// <summary>
+	/// Centralized conversion from line count to block height (world units).
+	/// Adjust logic here to affect all visualizers and animations.
+	/// </summary>
+	public static float ComputeBlockHeight(int lineCount)
+	{
+		return lineCount * Constants.UnitsPerLine;
+	}
+
+	/// <summary>
+	/// Computes the center Y coordinate for a block whose base should sit at baseY.
+	/// </summary>
+	public static float ComputeBlockCenterY(float baseY, float height)
+	{
+		return baseY + height / 2f;
+	}
+
+	/// <summary>
 	/// Computes block layouts (center position and size) for a single file tower at the given base position.
 	/// Blocks are stacked along +Y, with each block centered at currentY + height / 2.
 	/// </summary>
@@ -35,9 +52,9 @@ public static class LayoutCalculator
 		for (int i = 0; i < file.Lines.Count; i++)
 		{
 			LineGroup group = file.Lines[i];
-			float height = group.Length * Constants.UnitsPerLine;
+			float height = ComputeBlockHeight(group.Length);
 			Vector3 size = new(Constants.BlockWidth, height, Constants.BlockDepth);
-			Vector3 center = new(0f, currentY + height / 2f, 0f);
+			Vector3 center = new(0f, ComputeBlockCenterY(currentY, height), 0f);
 			blocks.Add(new BlockLayout(i, group.Type, height, size, center));
 			currentY += height;
 		}
