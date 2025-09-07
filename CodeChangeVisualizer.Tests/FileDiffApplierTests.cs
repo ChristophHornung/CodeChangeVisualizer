@@ -5,7 +5,7 @@ using FileAnalysisApplier = CodeChangeVisualizer.Analyzer.FileAnalysisApplier;
 
 public class FileDiffApplierTests
 {
-	private static LineGroup LG(LineType type, int length, int start = 0) =>
+	private static LineGroup Lg(LineType type, int length, int start = 0) =>
 		new LineGroup { Type = type, Length = length, Start = start };
 
 	private static void AssertSameSequence(FileAnalysis expected, FileAnalysis actual)
@@ -33,7 +33,7 @@ public class FileDiffApplierTests
 		{
 			File = "a.cs", Lines = new List<LineGroup>
 			{
-				FileDiffApplierTests.LG(LineType.Code, 5), FileDiffApplierTests.LG(LineType.Comment, 2)
+				FileDiffApplierTests.Lg(LineType.Code, 5), FileDiffApplierTests.Lg(LineType.Comment, 2)
 			}
 		};
 
@@ -52,7 +52,7 @@ public class FileDiffApplierTests
 		{
 			File = "a.cs", Lines = new List<LineGroup>
 			{
-				FileDiffApplierTests.LG(LineType.Code, 5), FileDiffApplierTests.LG(LineType.Comment, 2)
+				FileDiffApplierTests.Lg(LineType.Code, 5), FileDiffApplierTests.Lg(LineType.Comment, 2)
 			}
 		};
 		FileAnalysis newFa = new FileAnalysis { File = "a.cs", Lines = new List<LineGroup>() };
@@ -69,9 +69,9 @@ public class FileDiffApplierTests
 	public void Apply_Modify_DelegatesToDiffApplier()
 	{
 		FileAnalysis oldFa = new FileAnalysis
-			{ File = "a.cs", Lines = new List<LineGroup> { FileDiffApplierTests.LG(LineType.Code, 3) } };
+			{ File = "a.cs", Lines = new List<LineGroup> { FileDiffApplierTests.Lg(LineType.Code, 3) } };
 		FileAnalysis newFa = new FileAnalysis
-			{ File = "a.cs", Lines = new List<LineGroup> { FileDiffApplierTests.LG(LineType.Code, 5) } };
+			{ File = "a.cs", Lines = new List<LineGroup> { FileDiffApplierTests.Lg(LineType.Code, 5) } };
 
 		FileDiff fileDiff = FileDiffer.DiffFile(oldFa, newFa);
 		Assert.Equal(FileChangeKind.Modify, fileDiff.Kind);

@@ -9,9 +9,9 @@ using CodeChangeVisualizer.Analyzer;
 /// </summary>
 internal sealed class FakeGitClient : IGitClient
 {
-	private readonly List<string> _commits;
-	private readonly Dictionary<string, Dictionary<string, string>> _filesAtCommit; // commit -> (path -> content)
-	private readonly Dictionary<(string prev, string curr), List<GitChange>> _changes;
+	private readonly List<string> commits;
+	private readonly Dictionary<string, Dictionary<string, string>> filesAtCommit; // commit -> (path -> content)
+	private readonly Dictionary<(string prev, string curr), List<GitChange>> changes;
 
 	/// <summary>
 	/// Gets the list of files that were opened during testing.
@@ -28,9 +28,9 @@ internal sealed class FakeGitClient : IGitClient
 		Dictionary<string, Dictionary<string, string>> filesAtCommit,
 		Dictionary<(string prev, string curr), List<GitChange>> changes)
 	{
-		this._commits = commits ?? throw new ArgumentNullException(nameof(commits));
-		this._filesAtCommit = filesAtCommit ?? throw new ArgumentNullException(nameof(filesAtCommit));
-		this._changes = changes ?? throw new ArgumentNullException(nameof(changes));
+		this.commits = commits ?? throw new ArgumentNullException(nameof(commits));
+		this.filesAtCommit = filesAtCommit ?? throw new ArgumentNullException(nameof(filesAtCommit));
+		this.changes = changes ?? throw new ArgumentNullException(nameof(changes));
 	}
 
 	/// <summary>
@@ -48,11 +48,12 @@ internal sealed class FakeGitClient : IGitClient
 
 		if (string.Equals(gitStartOrRef, "initial", StringComparison.OrdinalIgnoreCase))
 		{
-			if (this._commits.Count == 0)
+			if (this.commits.Count == 0)
 			{
 				throw new InvalidOperationException("No commits available for 'initial' reference.");
 			}
-			return Task.FromResult(this._commits.First());
+
+			return Task.FromResult(this.commits.First());
 		}
 
 		return Task.FromResult(gitStartOrRef);
@@ -64,13 +65,13 @@ internal sealed class FakeGitClient : IGitClient
 	public Task<string> GetHeadShaAsync(string workingDirectory)
 	{
 		ArgumentNullException.ThrowIfNull(workingDirectory);
-		
-		if (this._commits.Count == 0)
+
+		if (this.commits.Count == 0)
 		{
 			throw new InvalidOperationException("No commits available for HEAD reference.");
 		}
-		
-		return Task.FromResult(this._commits.Last());
+
+		return Task.FromResult(this.commits.Last());
 	}
 
 	/// <summary>
@@ -82,14 +83,14 @@ internal sealed class FakeGitClient : IGitClient
 		ArgumentNullException.ThrowIfNull(startSha);
 		ArgumentNullException.ThrowIfNull(headSha);
 
-		int si = this._commits.IndexOf(startSha);
-		int ei = this._commits.IndexOf(headSha);
+		int si = this.commits.IndexOf(startSha);
+		int ei = this.commits.IndexOf(headSha);
 		if (si < 0 || ei < 0 || ei < si)
 		{
 			return Task.FromResult(new List<string>());
 		}
 
-		return Task.FromResult(this._commits.GetRange(si, ei - si + 1));
+		return Task.FromResult(this.commits.GetRange(si, ei - si + 1));
 	}
 
 	/// <summary>
@@ -100,7 +101,7 @@ internal sealed class FakeGitClient : IGitClient
 		ArgumentNullException.ThrowIfNull(workingDirectory);
 		ArgumentNullException.ThrowIfNull(sha);
 
-		if (this._filesAtCommit.TryGetValue(sha, out var map))
+		if (this.filesAtCommit.TryGetValue(sha, out var map))
 		{
 			return Task.FromResult(map.Keys.Select(FakeGitClient.Normalize).ToList());
 		}
@@ -117,7 +118,7 @@ internal sealed class FakeGitClient : IGitClient
 		ArgumentNullException.ThrowIfNull(prevSha);
 		ArgumentNullException.ThrowIfNull(sha);
 
-		if (this._changes.TryGetValue((prevSha, sha), out var list))
+		if (this.changes.TryGetValue((prevSha, sha), out var list))
 		{
 			return Task.FromResult(list);
 		}
@@ -136,8 +137,8 @@ internal sealed class FakeGitClient : IGitClient
 
 		string p = FakeGitClient.Normalize(repoRelativePath);
 		this.OpenedFiles.Add((sha, p));
-		
-		if (this._filesAtCommit.TryGetValue(sha, out var map) && map.TryGetValue(p, out string? content))
+
+		if (this.filesAtCommit.TryGetValue(sha, out var map) && map.TryGetValue(p, out string? content))
 		{
 			if (content == null)
 			{

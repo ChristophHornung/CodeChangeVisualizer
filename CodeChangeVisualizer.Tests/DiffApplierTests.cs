@@ -5,7 +5,7 @@ using DiffApplier = CodeChangeVisualizer.Analyzer.FileAnalysisApplier;
 
 public class DiffApplierTests
 {
-	private static LineGroup LG(LineType type, int length, int start = 0) =>
+	private static LineGroup Lg(LineType type, int length, int start = 0) =>
 		new LineGroup { Type = type, Length = length, Start = start };
 
 	private static void AssertSameSequence(FileAnalysis expected, FileAnalysis actual)
@@ -34,9 +34,9 @@ public class DiffApplierTests
 			File = "a.cs",
 			Lines = new List<LineGroup>
 			{
-				DiffApplierTests.LG(LineType.Code, 3), // 0
-				DiffApplierTests.LG(LineType.Comment, 2), // 1
-				DiffApplierTests.LG(LineType.Code, 5), // 2
+				DiffApplierTests.Lg(LineType.Code, 3), // 0
+				DiffApplierTests.Lg(LineType.Comment, 2), // 1
+				DiffApplierTests.Lg(LineType.Code, 5), // 2
 			}
 		};
 
@@ -57,10 +57,10 @@ public class DiffApplierTests
 			File = "a.cs",
 			Lines = new List<LineGroup>
 			{
-				DiffApplierTests.LG(LineType.Empty, 1),
-				DiffApplierTests.LG(LineType.Code, 4),
-				DiffApplierTests.LG(LineType.Code, 5),
-				DiffApplierTests.LG(LineType.Comment, 1)
+				DiffApplierTests.Lg(LineType.Empty, 1),
+				DiffApplierTests.Lg(LineType.Code, 4),
+				DiffApplierTests.Lg(LineType.Code, 5),
+				DiffApplierTests.Lg(LineType.Comment, 1)
 			}
 		};
 
@@ -75,9 +75,9 @@ public class DiffApplierTests
 			File = "a.cs",
 			Lines = new List<LineGroup>
 			{
-				DiffApplierTests.LG(LineType.Code, 5),
-				DiffApplierTests.LG(LineType.Comment, 2),
-				DiffApplierTests.LG(LineType.CodeAndComment, 4)
+				DiffApplierTests.Lg(LineType.Code, 5),
+				DiffApplierTests.Lg(LineType.Comment, 2),
+				DiffApplierTests.Lg(LineType.CodeAndComment, 4)
 			}
 		};
 		FileAnalysis newFa = new FileAnalysis
@@ -85,9 +85,9 @@ public class DiffApplierTests
 			File = "a.cs",
 			Lines = new List<LineGroup>
 			{
-				DiffApplierTests.LG(LineType.Code, 7),
-				DiffApplierTests.LG(LineType.CodeAndComment, 4),
-				DiffApplierTests.LG(LineType.Empty, 1),
+				DiffApplierTests.Lg(LineType.Code, 7),
+				DiffApplierTests.Lg(LineType.CodeAndComment, 4),
+				DiffApplierTests.Lg(LineType.Empty, 1),
 			}
 		};
 
@@ -122,12 +122,12 @@ public class DiffApplierTests
 	public void Roundtrip_Insert()
 	{
 		FileAnalysis oldFa = new FileAnalysis
-			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.LG(LineType.Code, 10) } };
+			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.Lg(LineType.Code, 10) } };
 		FileAnalysis newFa = new FileAnalysis
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup>
-				{ DiffApplierTests.LG(LineType.Code, 10), DiffApplierTests.LG(LineType.Comment, 3) }
+				{ DiffApplierTests.Lg(LineType.Code, 10), DiffApplierTests.Lg(LineType.Comment, 3) }
 		};
 
 		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
@@ -170,13 +170,13 @@ public class DiffApplierTests
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup>
-				{ DiffApplierTests.LG(LineType.Code, 10), DiffApplierTests.LG(LineType.Comment, 3) }
+				{ DiffApplierTests.Lg(LineType.Code, 10), DiffApplierTests.Lg(LineType.Comment, 3) }
 		};
 		FileAnalysis newFa = new FileAnalysis
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup>
-				{ DiffApplierTests.LG(LineType.Code, 10), DiffApplierTests.LG(LineType.Comment, 3) }
+				{ DiffApplierTests.Lg(LineType.Code, 10), DiffApplierTests.Lg(LineType.Comment, 3) }
 		};
 
 		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
@@ -192,10 +192,10 @@ public class DiffApplierTests
 		{
 			File = "a.cs",
 			Lines = new List<LineGroup>
-				{ DiffApplierTests.LG(LineType.Code, 10), DiffApplierTests.LG(LineType.Comment, 3) }
+				{ DiffApplierTests.Lg(LineType.Code, 10), DiffApplierTests.Lg(LineType.Comment, 3) }
 		};
 		FileAnalysis newFa = new FileAnalysis
-			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.LG(LineType.Code, 10) } };
+			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.Lg(LineType.Code, 10) } };
 
 		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
 		FileAnalysis patched = DiffApplier.Apply(oldFa, edits);
@@ -207,9 +207,9 @@ public class DiffApplierTests
 	public void Roundtrip_ResizeOnly()
 	{
 		FileAnalysis oldFa = new FileAnalysis
-			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.LG(LineType.Code, 10) } };
+			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.Lg(LineType.Code, 10) } };
 		FileAnalysis newFa = new FileAnalysis
-			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.LG(LineType.Code, 12) } };
+			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.Lg(LineType.Code, 12) } };
 
 		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
 		FileAnalysis patched = DiffApplier.Apply(oldFa, edits);
@@ -221,9 +221,9 @@ public class DiffApplierTests
 	public void Roundtrip_TypeChange_AsRemoveInsert()
 	{
 		FileAnalysis oldFa = new FileAnalysis
-			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.LG(LineType.Code, 10) } };
+			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.Lg(LineType.Code, 10) } };
 		FileAnalysis newFa = new FileAnalysis
-			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.LG(LineType.Comment, 10) } };
+			{ File = "a.cs", Lines = new List<LineGroup> { DiffApplierTests.Lg(LineType.Comment, 10) } };
 
 		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
 		FileAnalysis patched = DiffApplier.Apply(oldFa, edits);

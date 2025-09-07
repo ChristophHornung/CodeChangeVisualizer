@@ -4,11 +4,10 @@ using System.Text.Json;
 using CodeChangeVisualizer.Analyzer;
 using Stride.CommunityToolkit.Bepu;
 using Stride.CommunityToolkit.Engine;
-using Stride.CommunityToolkit.Skyboxes;
 using Stride.CommunityToolkit.Rendering.ProceduralModels;
+using Stride.CommunityToolkit.Skyboxes;
 using Stride.Core.Mathematics;
 using Stride.Engine;
-using Stride.Graphics;
 using Stride.Rendering;
 using Stride.Rendering.Materials;
 using Stride.Rendering.Materials.ComputeColors;
@@ -220,9 +219,9 @@ internal class Program
 	private static void EnsureGrassGround(Scene rootScene, Game game)
 	{
 		// We want an effectively infinite ground plane. We'll use a very large size and/or scale.
-		const float GroundSize = 100000f; // 100 km square, effectively infinite for our layouts
-		const float GroundThickness = 0.1f;
-		const float GroundScaleIfExists = 100f; // upscale existing ground to ensure huge effective size
+		const float groundSize = 100000f; // 100 km square, effectively infinite for our layouts
+		const float groundThickness = 0.1f;
+		const float groundScaleIfExists = 100f; // upscale existing ground to ensure huge effective size
 		
 		// Try to find an existing ground entity by name
 		Entity? ground = rootScene.Entities
@@ -233,10 +232,11 @@ internal class Program
 		if (ground == null)
 		{
 			// Create a very large, thin cube as ground so its top sits at Y=0
-			var options = new Primitive3DCreationOptions { Size = new Vector3(GroundSize, GroundThickness, GroundSize), IncludeCollider = false };
+			var options = new Primitive3DCreationOptions
+				{ Size = new Vector3(groundSize, groundThickness, groundSize), IncludeCollider = false };
 			Entity plane = game.Create3DPrimitive(PrimitiveModelType.Cube, options);
 			plane.Name = "Ground";
-			plane.Transform.Position = new Vector3(0f, -GroundThickness / 2f, 0f);
+			plane.Transform.Position = new Vector3(0f, -groundThickness / 2f, 0f);
 			ground = plane;
 			rootScene.Entities.Add(ground);
 		}
@@ -244,9 +244,9 @@ internal class Program
 		{
 			// Ensure existing ground is scaled up massively to appear infinite
 			Vector3 s = ground.Transform.Scale;
-			if (s.X < GroundScaleIfExists || s.Z < GroundScaleIfExists)
+			if (s.X < groundScaleIfExists || s.Z < groundScaleIfExists)
 			{
-				ground.Transform.Scale = new Vector3(GroundScaleIfExists, 1f, GroundScaleIfExists);
+				ground.Transform.Scale = new Vector3(groundScaleIfExists, 1f, groundScaleIfExists);
 			}
 		}
 		

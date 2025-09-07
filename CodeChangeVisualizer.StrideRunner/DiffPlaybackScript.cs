@@ -38,21 +38,21 @@ public class DiffPlaybackScript : SyncScript
 	};
 
 	// Runtime state
-	private readonly Dictionary<string, FileAnalysis> _currentAnalyses = new(StringComparer.OrdinalIgnoreCase);
-	private readonly Dictionary<string, Entity> _towers = new(StringComparer.OrdinalIgnoreCase);
-	private int _nextGridIndex;
-	private int _diffIndex; // index of the next diff step to play (we do not mutate Diffs)
+	private readonly Dictionary<string, FileAnalysis> currentAnalyses = new(StringComparer.OrdinalIgnoreCase);
+	private readonly Dictionary<string, Entity> towers = new(StringComparer.OrdinalIgnoreCase);
+	private int nextGridIndex;
+	private int diffIndex; // index of the next diff step to play (we do not mutate Diffs)
 
 	// Animation state per step
-	private bool _animating;
-	private float _elapsed;
+	private bool animating;
+	private float elapsed;
 
-	private StepAnimation? _currentStep;
+	private StepAnimation? currentStep;
 
 	// Autoplay flag: when true, we keep advancing steps automatically when not animating
-	private bool _autoPlay;
+	private bool autoPlay;
 
-	private Model? _templateModel;
+	private Model? templateModel;
 
 	[DataMemberIgnore]
 	public List<FileAnalysis> InitialAnalysis { get; set; } = new();
@@ -100,7 +100,7 @@ public class DiffPlaybackScript : SyncScript
 		var roots = this.SceneSystem.SceneInstance?.RootScene.Entities;
 		foreach (var file in this.InitialAnalysis)
 		{
-			this._currentAnalyses[file.File] = new FileAnalysis
+			this.currentAnalyses[file.File] = new FileAnalysis
 			{
 				File = file.File,
 				Lines = file.Lines.Select(g => new LineGroup { Type = g.Type, Length = g.Length, Start = g.Start })
@@ -110,12 +110,12 @@ public class DiffPlaybackScript : SyncScript
 				roots.FirstOrDefault(e => string.Equals(e.Name, file.File, StringComparison.OrdinalIgnoreCase));
 			if (root != null)
 			{
-				this._towers[file.File] = root;
+				this.towers[file.File] = root;
 			}
 		}
 
-		this._nextGridIndex = this._towers.Count; // append for newly added towers
-		this._diffIndex = 0; // start from the first diff step
+		this.nextGridIndex = this.towers.Count; // append for newly added towers
+		this.diffIndex = 0; // start from the first diff step
 	}
 
 	public override void Update()
@@ -125,7 +125,7 @@ public class DiffPlaybackScript : SyncScript
 			return;
 		}
 
-		if (!this._animating)
+		if (!this.animating)
 		{
 			// Reset to first visualization on 'R'
 			if (this.Input.IsKeyPressed(Keys.R))
@@ -142,14 +142,14 @@ public class DiffPlaybackScript : SyncScript
 			// Toggle autoplay with 'L' (play all remaining steps, sequentially)
 			if (this.Input.IsKeyPressed(Keys.L))
 			{
-				this._autoPlay = !this._autoPlay;
-				Console.WriteLine(this._autoPlay
+				this.autoPlay = !this.autoPlay;
+				Console.WriteLine(this.autoPlay
 					? "[Playback] Autoplay ON (will advance with 2s per step)."
 					: "[Playback] Autoplay OFF.");
 			}
 
 			// If autoplay is enabled and not animating, attempt to start the next step
-			if (this._autoPlay)
+			if (this.autoPlay)
 			{
 				this.StartNextStep();
 			}
@@ -158,16 +158,16 @@ public class DiffPlaybackScript : SyncScript
 		}
 
 		// Animate current step
-		this._elapsed += (float)this.Game.UpdateTime.Elapsed.TotalSeconds;
-		float t = Math.Min(1f, this._elapsed / DiffPlaybackScript.AnimationDuration);
+		this.elapsed += (float)this.Game.UpdateTime.Elapsed.TotalSeconds;
+		float t = Math.Min(1f, this.elapsed / DiffPlaybackScript.AnimationDuration);
 
-		if (this._currentStep == null)
+		if (this.currentStep == null)
 		{
-			this._animating = false;
+			this.animating = false;
 			return;
 		}
 
-		foreach (TowerAnim tower in this._currentStep.Towers)
+		foreach (TowerAnim tower in this.currentStep.Towers)
 		{
 			if (tower.IsDelete)
 			{
@@ -240,7 +240,7 @@ public class DiffPlaybackScript : SyncScript
 		if (t >= 1f)
 		{
 			// Finalize: apply end state, cleanup removes and deletes, reset scales
-			foreach (TowerAnim tower in this._currentStep.Towers)
+			foreach (TowerAnim tower in this.currentStep.Towers)
 			{
 				if (tower.IsDelete)
 				{
@@ -250,8 +250,8 @@ public class DiffPlaybackScript : SyncScript
 						this.SceneSystem.SceneInstance?.RootScene.Entities.Remove(tower.Root);
 					}
 
-					this._towers.Remove(tower.File);
-					this._currentAnalyses.Remove(tower.File);
+					this.towers.Remove(tower.File);
+					this.currentAnalyses.Remove(tower.File);
 					continue;
 				}
 
@@ -288,28 +288,28 @@ public class DiffPlaybackScript : SyncScript
 				// Update current analysis
 				if (tower.TargetAnalysis != null)
 				{
-					this._currentAnalyses[tower.File] = tower.TargetAnalysis;
+					this.currentAnalyses[tower.File] = tower.TargetAnalysis;
 				}
 			}
 
-			Console.WriteLine($"[Playback] Step {this._diffIndex} completed.");
-			this._animating = false;
-			this._currentStep = null;
+			Console.WriteLine($"[Playback] Step {this.diffIndex} completed.");
+			this.animating = false;
+			this.currentStep = null;
 		}
 	}
 
 	private void ResetToInitialVisualization()
 	{
 		// Stop any ongoing animation
-		this._animating = false;
-		this._elapsed = 0f;
-		this._currentStep = null;
+		this.animating = false;
+		this.elapsed = 0f;
+		this.currentStep = null;
 
 		// Remove all current tower entities from the scene
 		var rootEntities = this.SceneSystem.SceneInstance?.RootScene.Entities;
 		if (rootEntities != null)
 		{
-			foreach (var kv in this._towers.ToList())
+			foreach (var kv in this.towers.ToList())
 			{
 				if (kv.Value != null)
 				{
@@ -319,24 +319,24 @@ public class DiffPlaybackScript : SyncScript
 		}
 
 		// Clear runtime maps
-		this._towers.Clear();
-		this._currentAnalyses.Clear();
+		this.towers.Clear();
+		this.currentAnalyses.Clear();
 
 		// Reset playback to the beginning and rebuild the towers using the same layout logic as creation
-		this._diffIndex = 0;
+		this.diffIndex = 0;
 
 		// Rebuild the towers using the same layout logic as creation via the planner
 		int total = this.InitialAnalysis.Count;
-		this._planner.SetFiles(this.InitialAnalysis);
+		this.planner.SetFiles(this.InitialAnalysis);
 		for (int index = 0; index < total; index++)
 		{
 			var file = this.InitialAnalysis[index];
-			Vector3 pos = this._planner.GetPosition(index);
+			Vector3 pos = this.planner.GetPosition(index);
 			Entity fileRoot = new Entity(file.File);
 			fileRoot.Transform.Position = new Vector3(pos.X, 0f, pos.Z);
 			rootEntities?.Add(fileRoot);
-			this._towers[file.File] = fileRoot;
-			this._currentAnalyses[file.File] = new FileAnalysis
+			this.towers[file.File] = fileRoot;
+			this.currentAnalyses[file.File] = new FileAnalysis
 			{
 				File = file.File,
 				Lines = file.Lines.Select(g => new LineGroup { Type = g.Type, Length = g.Length, Start = g.Start })
@@ -352,8 +352,8 @@ public class DiffPlaybackScript : SyncScript
     currentY += LayoutCalculator.ComputeBlockHeight(group.Length);
 			}
 		}
-		
-		this._nextGridIndex = this._towers.Count;
+
+		this.nextGridIndex = this.towers.Count;
 	}
 
 	private void StartNextStep()
@@ -361,31 +361,38 @@ public class DiffPlaybackScript : SyncScript
 		if (this.Diffs.Count == 0)
 		{
 			Console.WriteLine("[Playback] No diffs available.");
-			this._autoPlay = false;
+			this.autoPlay = false;
 			return;
 		}
 
-		if (this._diffIndex >= this.Diffs.Count)
+		if (this.diffIndex >= this.Diffs.Count)
 		{
 			Console.WriteLine("[Playback] No more steps to play. Reached the end of the revision log.");
 			// Stop autoplay if it was active
-			this._autoPlay = false;
+			this.autoPlay = false;
 			return;
 		}
 
-		Console.WriteLine($"[Playback] SPACE pressed: starting step {this._diffIndex + 1}/{this.Diffs.Count}");
-		List<FileChangeEntry> diff = this.Diffs[this._diffIndex];
-		Console.WriteLine($"[Playback] Step {this._diffIndex + 1}: {diff.Count} file change(s)");
-		this._diffIndex++;
+		Console.WriteLine($"[Playback] SPACE pressed: starting step {this.diffIndex + 1}/{this.Diffs.Count}");
+		List<FileChangeEntry> diff = this.Diffs[this.diffIndex];
+		Console.WriteLine($"[Playback] Step {this.diffIndex + 1}: {diff.Count} file change(s)");
+		this.diffIndex++;
 
 		// Compute current and future layouts to animate tower movements
-		var currentList = this._currentAnalyses.Values.OrderBy(f => f.File, StringComparer.OrdinalIgnoreCase).ToList();
+		var currentList = this.currentAnalyses.Values.OrderBy(f => f.File, StringComparer.OrdinalIgnoreCase).ToList();
 		var currentIndex = currentList.Select((f, i) => new { f.File, i }).ToDictionary(x => x.File, x => x.i, StringComparer.OrdinalIgnoreCase);
-		this._planner.SetFiles(currentList);
-		Dictionary<string, Vector3> currentPositions = currentList.ToDictionary(f => f.File, f => this._planner.GetPosition(currentIndex[f.File]), StringComparer.OrdinalIgnoreCase);
+		this.planner.SetFiles(currentList);
+		Dictionary<string, Vector3> currentPositions = currentList.ToDictionary(f => f.File,
+			f => this.planner.GetPosition(currentIndex[f.File]), StringComparer.OrdinalIgnoreCase);
 		
 		// Apply diffs to get future list
-		Dictionary<string, FileAnalysis> futureMap = this._currentAnalyses.ToDictionary(kv => kv.Key, kv => new FileAnalysis { File = kv.Value.File, Lines = kv.Value.Lines.Select(g => new LineGroup { Type = g.Type, Length = g.Length, Start = g.Start }).ToList() }, StringComparer.OrdinalIgnoreCase);
+		Dictionary<string, FileAnalysis> futureMap = this.currentAnalyses.ToDictionary(kv => kv.Key,
+			kv => new FileAnalysis
+			{
+				File = kv.Value.File,
+				Lines = kv.Value.Lines.Select(g => new LineGroup { Type = g.Type, Length = g.Length, Start = g.Start })
+					.ToList()
+			}, StringComparer.OrdinalIgnoreCase);
 		foreach (var change in diff)
 		{
 			string file = change.File;
@@ -404,8 +411,9 @@ public class DiffPlaybackScript : SyncScript
 		}
 		var futureList = futureMap.Values.OrderBy(f => f.File, StringComparer.OrdinalIgnoreCase).ToList();
 		var futureIndex = futureList.Select((f, i) => new { f.File, i }).ToDictionary(x => x.File, x => x.i, StringComparer.OrdinalIgnoreCase);
-		this._planner.SetFiles(futureList);
-		Dictionary<string, Vector3> futurePositions = futureList.ToDictionary(f => f.File, f => this._planner.GetPosition(futureIndex[f.File]), StringComparer.OrdinalIgnoreCase);
+		this.planner.SetFiles(futureList);
+		Dictionary<string, Vector3> futurePositions = futureList.ToDictionary(f => f.File,
+			f => this.planner.GetPosition(futureIndex[f.File]), StringComparer.OrdinalIgnoreCase);
 		
 		StepAnimation step = new StepAnimation();
 		
@@ -431,7 +439,7 @@ public class DiffPlaybackScript : SyncScript
 				Console.WriteLine($"  [Playback] DELETE {file}");
 			}
 
-			this._currentAnalyses.TryGetValue(file, out FileAnalysis? current);
+			this.currentAnalyses.TryGetValue(file, out FileAnalysis? current);
 			current ??= new FileAnalysis { File = file, Lines = new List<LineGroup>() };
 
 			// Compute target analysis using unified applier
@@ -439,7 +447,7 @@ public class DiffPlaybackScript : SyncScript
 
 			TowerAnim towerAnim = new TowerAnim { File = file, TargetAnalysis = target };
 
-			bool hasRoot = this._towers.TryGetValue(file, out Entity? root);
+			bool hasRoot = this.towers.TryGetValue(file, out Entity? root);
 			if (fad.Kind == FileAnalysisChangeKind.FileDelete)
 			{
 				// Sink the tower and remove
@@ -458,9 +466,9 @@ public class DiffPlaybackScript : SyncScript
 			if (!hasRoot || root == null)
 			{
 				// Add new tower: create with blocks at 0 height and grow
-				root = this.CreateTowerRoot(file, this._nextGridIndex++);
+				root = this.CreateTowerRoot(file, this.nextGridIndex++);
 				this.SceneSystem.SceneInstance?.RootScene.Entities.Add(root);
-				this._towers[file] = root;
+				this.towers[file] = root;
 				towerAnim.Root = root;
 				towerAnim.IsAdd = true;
 				// Place at future layout position
@@ -663,7 +671,7 @@ public class DiffPlaybackScript : SyncScript
 		}
 
 		// Also add pure movement animations for towers not in diff but whose position changes
-		foreach (var kv in this._towers)
+		foreach (var kv in this.towers)
 		{
 			string file = kv.Key;
 			// Skip if this tower already has an entry in this step
@@ -682,7 +690,7 @@ public class DiffPlaybackScript : SyncScript
 					StartRootPos = startP,
 					EndRootPos = endP,
 					MoveRoot = true,
-					TargetAnalysis = this._currentAnalyses[file]
+					TargetAnalysis = this.currentAnalyses[file]
 				});
 			}
 		}
@@ -693,24 +701,25 @@ public class DiffPlaybackScript : SyncScript
 		Console.WriteLine(
 			$"[Playback] Step summary: towers affected={step.Towers.Count} (add={addCount}, delete={delCount}, modify={modCount})");
 
-		this._currentStep = step;
-		this._elapsed = 0f;
-		this._animating = true;
+		this.currentStep = step;
+		this.elapsed = 0f;
+		this.animating = true;
 	}
 
- private readonly ICityPlanner _planner = CityPlannerFactory.CreateFromEnv();
+	private readonly ICityPlanner planner = CityPlannerFactory.CreateFromEnv();
 
  private Entity CreateTowerRoot(string file, int index)
  {
  	// Build a file list representing current files plus this new file to determine position.
- 	var filesList = this._currentAnalyses.Values.ToList();
+    var filesList = this.currentAnalyses.Values.ToList();
  	if (!filesList.Any(f => string.Equals(f.File, file, StringComparison.OrdinalIgnoreCase)))
  	{
  		// If we have a target analysis for this file in the current step, prefer that; otherwise, create a stub.
  		filesList.Add(new FileAnalysis { File = file, Lines = new List<LineGroup>() });
  	}
- 	this._planner.SetFiles(filesList);
- 	Vector3 pos = this._planner.GetPosition(index);
+
+    this.planner.SetFiles(filesList);
+    Vector3 pos = this.planner.GetPosition(index);
  	Entity fileRoot = new Entity(file);
  	fileRoot.Transform.Position = new Vector3(pos.X, 0f, pos.Z);
  	return fileRoot;
@@ -718,7 +727,7 @@ public class DiffPlaybackScript : SyncScript
 
 	private void EnsureTemplateModel()
 	{
-		if (this._templateModel != null)
+		if (this.templateModel != null)
 		{
 			return;
 		}
@@ -732,14 +741,14 @@ public class DiffPlaybackScript : SyncScript
 				var modelComp = e.Get<ModelComponent>();
 				if (modelComp != null && modelComp.Model != null && e.Get<BlockDescriptorComponent>() != null)
 				{
-					this._templateModel = modelComp.Model;
+					this.templateModel = modelComp.Model;
 					break;
 				}
 			}
 		}
 
 		// If still null, synthesize a 1x1x1 cube model procedurally and keep its Model
-		if (this._templateModel == null)
+		if (this.templateModel == null)
 		{
 			var game = this.Game as Game;
 			if (game != null)
@@ -750,7 +759,7 @@ public class DiffPlaybackScript : SyncScript
 				var modelComp = temp.Get<ModelComponent>();
 				if (modelComp != null)
 				{
-					this._templateModel = modelComp.Model;
+					this.templateModel = modelComp.Model;
 				}
 				// We don't add 'temp' to the scene; it will be GC'ed. We only need the shared Model
 			}
@@ -766,9 +775,9 @@ public class DiffPlaybackScript : SyncScript
 		this.EnsureTemplateModel();
 
 		Entity cube = new Entity(file);
-		if (this._templateModel != null)
+		if (this.templateModel != null)
 		{
-			cube.Add(new ModelComponent { Model = this._templateModel });
+			cube.Add(new ModelComponent { Model = this.templateModel });
 		}
 
 		// Position so the base sits at currentY (cube is centered, so add half-height)

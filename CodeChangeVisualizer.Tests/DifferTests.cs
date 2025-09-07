@@ -4,7 +4,7 @@ using CodeChangeVisualizer.Analyzer;
 
 public class DifferTests
 {
-	private static LineGroup LG(LineType type, int length, int start = 0) =>
+	private static LineGroup Lg(LineType type, int length, int start = 0) =>
 		new LineGroup { Type = type, Length = length, Start = start };
 
 	[Fact]
@@ -15,9 +15,9 @@ public class DifferTests
 			File = "a.cs",
 			Lines = new List<LineGroup>
 			{
-				DifferTests.LG(LineType.Code, 5),
-				DifferTests.LG(LineType.Comment, 2),
-				DifferTests.LG(LineType.CodeAndComment, 4)
+				DifferTests.Lg(LineType.Code, 5),
+				DifferTests.Lg(LineType.Comment, 2),
+				DifferTests.Lg(LineType.CodeAndComment, 4)
 			}
 		};
 		FileAnalysis newFa = new FileAnalysis
@@ -25,9 +25,9 @@ public class DifferTests
 			File = "a.cs",
 			Lines = new List<LineGroup>
 			{
-				DifferTests.LG(LineType.Code, 7), // resized from 5 -> 7
-				DifferTests.LG(LineType.CodeAndComment, 4), // comment removed, CC aligned
-				DifferTests.LG(LineType.Empty, 1), // new empty insert
+				DifferTests.Lg(LineType.Code, 7), // resized from 5 -> 7
+				DifferTests.Lg(LineType.CodeAndComment, 4), // comment removed, CC aligned
+				DifferTests.Lg(LineType.Empty, 1), // new empty insert
 			}
 		};
 
@@ -81,11 +81,11 @@ public class DifferTests
 	public void Insert_NewBlock_ShouldReportInsertWithIndex()
 	{
 		FileAnalysis oldFa = new FileAnalysis
-			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 10) } };
+			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.Lg(LineType.Code, 10) } };
 		FileAnalysis newFa = new FileAnalysis
 		{
 			File = "a.cs",
-			Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 10), DifferTests.LG(LineType.Comment, 3) }
+			Lines = new List<LineGroup> { DifferTests.Lg(LineType.Code, 10), DifferTests.Lg(LineType.Comment, 3) }
 		};
 
 		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
@@ -128,12 +128,12 @@ public class DifferTests
 		FileAnalysis oldFa = new FileAnalysis
 		{
 			File = "a.cs",
-			Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 10), DifferTests.LG(LineType.Comment, 3) }
+			Lines = new List<LineGroup> { DifferTests.Lg(LineType.Code, 10), DifferTests.Lg(LineType.Comment, 3) }
 		};
 		FileAnalysis newFa = new FileAnalysis
 		{
 			File = "a.cs",
-			Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 10), DifferTests.LG(LineType.Comment, 3) }
+			Lines = new List<LineGroup> { DifferTests.Lg(LineType.Code, 10), DifferTests.Lg(LineType.Comment, 3) }
 		};
 
 		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
@@ -146,10 +146,10 @@ public class DifferTests
 		FileAnalysis oldFa = new FileAnalysis
 		{
 			File = "a.cs",
-			Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 10), DifferTests.LG(LineType.Comment, 3) }
+			Lines = new List<LineGroup> { DifferTests.Lg(LineType.Code, 10), DifferTests.Lg(LineType.Comment, 3) }
 		};
 		FileAnalysis newFa = new FileAnalysis
-			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 10) } };
+			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.Lg(LineType.Code, 10) } };
 
 		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
 		DiffEdit e = Assert.Single(edits);
@@ -165,9 +165,9 @@ public class DifferTests
 	public void Resize_SingleBlock_ShouldReportResize()
 	{
 		FileAnalysis oldFa = new FileAnalysis
-			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 10) } };
+			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.Lg(LineType.Code, 10) } };
 		FileAnalysis newFa = new FileAnalysis
-			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 12) } };
+			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.Lg(LineType.Code, 12) } };
 
 		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
 		DiffEdit e = Assert.Single(edits);
@@ -183,9 +183,9 @@ public class DifferTests
 	public void TypeChange_ShouldBeRemoveThenInsert()
 	{
 		FileAnalysis oldFa = new FileAnalysis
-			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.LG(LineType.Code, 10) } };
+			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.Lg(LineType.Code, 10) } };
 		FileAnalysis newFa = new FileAnalysis
-			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.LG(LineType.Comment, 10) } };
+			{ File = "a.cs", Lines = new List<LineGroup> { DifferTests.Lg(LineType.Comment, 10) } };
 
 		List<DiffEdit> edits = Differ.Diff(oldFa, newFa);
 		Assert.Equal(2, edits.Count);

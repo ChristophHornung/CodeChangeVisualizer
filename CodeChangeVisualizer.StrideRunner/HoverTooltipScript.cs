@@ -13,13 +13,13 @@ using Stride.Graphics;
 /// </summary>
 public class HoverTooltipScript : SyncScript
 {
-	private CameraComponent? _camera;
-	private readonly List<Entity> _blocks = new();
+	private CameraComponent? camera;
+	private readonly List<Entity> blocks = new();
 
 	/// <summary>
 	/// Ray vs AABB test. Returns true if intersects and outputs the nearest positive distance t along the ray.
 	/// </summary>
-	private static bool RayIntersectsAABB(Vector3 origin, Vector3 dir, Vector3 min, Vector3 max, out float tNear)
+	private static bool RayIntersectsAabb(Vector3 origin, Vector3 dir, Vector3 min, Vector3 max, out float tNear)
 	{
 		tNear = 0f;
 		float tFar = float.MaxValue;
@@ -69,7 +69,7 @@ public class HoverTooltipScript : SyncScript
 	public override void Start()
 	{
 		// Find a camera in the scene (created by SetupBase3DScene)
-		this._camera = this.SceneSystem.SceneInstance?.RootScene.Entities
+		this.camera = this.SceneSystem.SceneInstance?.RootScene.Entities
 			.Select(e => e.Get<CameraComponent>())
 			.FirstOrDefault(c => c != null);
 
@@ -83,7 +83,7 @@ public class HoverTooltipScript : SyncScript
 	public override void Update()
 	{
 		this.RefreshBlocks();
-		if (this._camera == null || this._blocks.Count == 0)
+		if (this.camera == null || this.blocks.Count == 0)
 		{
 			return;
 		}
@@ -107,14 +107,14 @@ public class HoverTooltipScript : SyncScript
 		// Use CommunityToolkit's helper to get a world-space ray segment from screen coordinates
 		Vector2 mousePos = mouse; // create variable so it can be passed by ref if required by API
 		RaySegment segment;
-		this._camera.ScreenToWorldRaySegment(ref mousePos, out segment);
+		this.camera.ScreenToWorldRaySegment(ref mousePos, out segment);
 		Vector3 rayOrigin = segment.Start;
 		Vector3 rayDir = Vector3.Normalize(segment.End - segment.Start);
 
 		// Find closest intersected block
 		Entity? closestBlock = null;
 		float closestT = float.MaxValue;
-		foreach (Entity block in this._blocks)
+		foreach (Entity block in this.blocks)
 		{
 			BlockDescriptorComponent? desc = block.Get<BlockDescriptorComponent>();
 			if (desc == null)
@@ -126,7 +126,7 @@ public class HoverTooltipScript : SyncScript
 			Vector3 half = desc.Size * 0.5f;
 			Vector3 min = pos - half;
 			Vector3 max = pos + half;
-			if (HoverTooltipScript.RayIntersectsAABB(rayOrigin, rayDir, min, max, out float t) && t >= 0 &&
+			if (HoverTooltipScript.RayIntersectsAabb(rayOrigin, rayDir, min, max, out float t) && t >= 0 &&
 			    t < closestT)
 			{
 				closestT = t;
@@ -153,7 +153,7 @@ public class HoverTooltipScript : SyncScript
 
 			// Compute the world hit position and project to screen space (normalized 0..1, top-left origin)
 			Vector3 hitPoint = rayOrigin + rayDir * closestT;
-			Vector3 screenNorm = this._camera.WorldToScreenPoint(hitPoint);
+			Vector3 screenNorm = this.camera.WorldToScreenPoint(hitPoint);
 
 			// Convert to pixel coordinates without Y inversion (DebugText expects top-left origin)
 			Texture? backBuffer = this.GraphicsDevice.Presenter?.BackBuffer;
@@ -169,7 +169,7 @@ public class HoverTooltipScript : SyncScript
 	private void RefreshBlocks()
 	{
 		// Rebuild block cache each frame to include newly added towers/blocks
-		this._blocks.Clear();
+		this.blocks.Clear();
 		foreach (Entity entity in this.SceneSystem.SceneInstance?.RootScene.Entities ?? Enumerable.Empty<Entity>())
 		{
 			this.CollectBlocksRecursive(entity);
@@ -180,7 +180,7 @@ public class HoverTooltipScript : SyncScript
 	{
 		if (entity.Get<BlockDescriptorComponent>() != null)
 		{
-			this._blocks.Add(entity);
+			this.blocks.Add(entity);
 		}
 
 		// Recurse into children

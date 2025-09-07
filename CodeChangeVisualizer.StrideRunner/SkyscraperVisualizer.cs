@@ -5,7 +5,6 @@ using Stride.CommunityToolkit.Bepu;
 using Stride.CommunityToolkit.Rendering.ProceduralModels;
 using Stride.Core.Mathematics;
 using Stride.Engine;
-using Stride.Graphics;
 using Stride.Rendering;
 using Stride.Rendering.Materials;
 using Stride.Rendering.Materials.ComputeColors;
@@ -38,11 +37,11 @@ public class SkyscraperVisualizer
 	private static readonly Dictionary<int, Material> MaterialCache = new();
 
 	// Reuse a single unit-cube model for all blocks to avoid creating thousands of meshes
-	private static Model? s_UnitCubeModel;
+	private static Model? sUnitCubeModel;
 
 	private static void EnsureUnitCubeModel(Game game)
 	{
-		if (SkyscraperVisualizer.s_UnitCubeModel != null)
+		if (SkyscraperVisualizer.sUnitCubeModel != null)
 		{
 			return;
 		}
@@ -51,7 +50,7 @@ public class SkyscraperVisualizer
 		var createOptions = new Primitive3DCreationOptions { Size = new Vector3(1f, 1f, 1f), IncludeCollider = false };
 		Entity temp = game.Create3DPrimitive(PrimitiveModelType.Cube, createOptions);
 		var modelComp = temp.Get<ModelComponent>();
-		SkyscraperVisualizer.s_UnitCubeModel = modelComp?.Model;
+		SkyscraperVisualizer.sUnitCubeModel = modelComp?.Model;
 		// We don't add temp to the scene; it will be GC'ed. We only keep the Model reference.
 	}
 
@@ -228,9 +227,9 @@ public class SkyscraperVisualizer
 
  	// Create an entity that reuses a shared unit-cube model and scale it to desired size
  	Entity cube = new Entity(file.File);
- 	if (SkyscraperVisualizer.s_UnitCubeModel != null)
+    if (SkyscraperVisualizer.sUnitCubeModel != null)
  	{
- 		cube.Add(new ModelComponent { Model = SkyscraperVisualizer.s_UnitCubeModel });
+	    cube.Add(new ModelComponent { Model = SkyscraperVisualizer.sUnitCubeModel });
  	}
 
  	// Position so the base sits at currentY (cube is centered, so add half-height)

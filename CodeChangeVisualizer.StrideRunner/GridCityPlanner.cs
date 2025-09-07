@@ -12,29 +12,29 @@ using Stride.Graphics;
 public sealed class GridCityPlanner : ICityPlanner
 {
 	private const float TowerSpacing = LayoutCalculator.Constants.TowerSpacing;
-	private IReadOnlyList<FileAnalysis>? _files;
+	private IReadOnlyList<FileAnalysis>? files;
 
 	// Stability state
-	private readonly Dictionary<string, int> _assignedIndexByFile = new(StringComparer.OrdinalIgnoreCase);
-	private readonly Dictionary<string, Vector3> _positionByFile = new(StringComparer.OrdinalIgnoreCase);
-	private List<Vector3> _lastPositions = new(); // positions aligned with the latest SetFiles(files) order
-	private int _fixedCols = 0; // fixed number of columns chosen at the first non-empty SetFiles
+	private readonly Dictionary<string, int> assignedIndexByFile = new(StringComparer.OrdinalIgnoreCase);
+	private readonly Dictionary<string, Vector3> positionByFile = new(StringComparer.OrdinalIgnoreCase);
+	private List<Vector3> lastPositions = new(); // positions aligned with the latest SetFiles(files) order
+	private int fixedCols = 0; // fixed number of columns chosen at the first non-empty SetFiles
 
 	public void SetFiles(IReadOnlyList<FileAnalysis> files)
 	{
-		this._files = files;
+		this.files = files;
 		// Initialize fixed columns on the first non-empty call
-		if (this._fixedCols <= 0)
+		if (this.fixedCols <= 0)
 		{
 			int count = files?.Count ?? 0;
 			if (count > 0)
 			{
-				this._fixedCols = System.Math.Max(1, (int)System.Math.Ceiling(System.Math.Sqrt(count)));
+				this.fixedCols = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(count)));
 			}
 		}
 
 		// Rebuild alignment for the provided files order while preserving positions for known files
-		this._lastPositions = new List<Vector3>(files?.Count ?? 0);
+		this.lastPositions = new List<Vector3>(files?.Count ?? 0);
 		if (files == null)
 		{
 			return;
@@ -43,13 +43,13 @@ public sealed class GridCityPlanner : ICityPlanner
 		for (int i = 0; i < files.Count; i++)
 		{
 			string file = files[i].File;
-			if (!this._positionByFile.TryGetValue(file, out Vector3 pos))
+			if (!this.positionByFile.TryGetValue(file, out Vector3 pos))
 			{
 				// Assign a new slot index at the end (append) and compute its position using a square-layer growth pattern.
 				// This expands the grid in both X (cols) and Z (rows) without moving previously assigned towers.
-				int slot = this._assignedIndexByFile.Count;
-				this._assignedIndexByFile[file] = slot;
-				int k = System.Math.Max(1, (int)System.Math.Ceiling(System.Math.Sqrt(slot + 1))); // current square size
+				int slot = this.assignedIndexByFile.Count;
+				this.assignedIndexByFile[file] = slot;
+				int k = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(slot + 1))); // current square size
 				int prevSquare = (k - 1) * (k - 1);
 				int indexWithinLayer = slot - prevSquare;
 				int row, col;
@@ -66,31 +66,33 @@ public sealed class GridCityPlanner : ICityPlanner
 					col = indexWithinLayer - k;
 				}
 				pos = new Vector3(col * GridCityPlanner.TowerSpacing, 0f, row * GridCityPlanner.TowerSpacing);
-				this._positionByFile[file] = pos;
+				this.positionByFile[file] = pos;
 			}
-			this._lastPositions.Add(pos);
+
+			this.lastPositions.Add(pos);
 		}
 	}
 
 	public Vector3 GetPosition(int index)
 	{
-		if (index < 0 || index >= this._lastPositions.Count)
+		if (index < 0 || index >= this.lastPositions.Count)
 		{
 			// Out of bounds: return origin to avoid exceptions
 			return Vector3.Zero;
 		}
-		return this._lastPositions[index];
+
+		return this.lastPositions[index];
 	}
 
 	public (int rows, int cols, int gridSize) GetGrid()
 	{
-		int totalCount = this._files?.Count ?? 0;
+		int totalCount = this.files?.Count ?? 0;
 		if (totalCount <= 0)
 		{
 			return (0, 0, 0);
 		}
 		// Report a square bound that encloses all assigned positions without moving existing towers.
-		int k = System.Math.Max(1, (int)System.Math.Ceiling(System.Math.Sqrt(totalCount)));
+		int k = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(totalCount)));
 		int rows = k;
 		int cols = k;
 		int gridSize = k;
@@ -99,7 +101,7 @@ public sealed class GridCityPlanner : ICityPlanner
 
 	public (Vector3 position, Quaternion rotation) GetFullViewCameraPosition(Game game, CameraComponent camera)
 	{
-		int count = this._files?.Count ?? 0;
+		int count = this.files?.Count ?? 0;
 		if (count <= 0)
 		{
 			// Default camera at origin looking down -Z with no rotation
@@ -109,7 +111,7 @@ public sealed class GridCityPlanner : ICityPlanner
 		var (rows, cols, gridSize) = this.GetGrid();
 		float width = (cols - 1) * GridCityPlanner.TowerSpacing;
 		float depth = (rows - 1) * GridCityPlanner.TowerSpacing;
-		float maxHeight = (this._files ?? Array.Empty<FileAnalysis>())
+		float maxHeight = (this.files ?? Array.Empty<FileAnalysis>())
 			.Select(f => (f.Lines?.Sum(g => g.Length) ?? 0) * LayoutCalculator.Constants.UnitsPerLine)
 			.DefaultIfEmpty(0f).Max();
 
@@ -117,7 +119,7 @@ public sealed class GridCityPlanner : ICityPlanner
 
 		// Compute center and bounding sphere radius
 		Vector3 center = new Vector3(width / 2f, Math.Max(0.5f, maxHeight / 2f), depth / 2f);
-		float radius = 0.5f * (float)System.Math.Sqrt(width * width + depth * depth + maxHeight * maxHeight);
+		float radius = 0.5f * (float)Math.Sqrt(width * width + depth * depth + maxHeight * maxHeight);
 
 		float vfov = camera.VerticalFieldOfView;
 		if (vfov <= 0f)
@@ -129,24 +131,24 @@ public sealed class GridCityPlanner : ICityPlanner
 		float aspect = (backBuffer != null && backBuffer.Height > 0)
 			? (float)backBuffer.Width / backBuffer.Height
 			: (16f / 9f);
-		float hfov = 2f * (float)System.Math.Atan(System.Math.Tan(vfov / 2f) * aspect);
-		float limitingFov = System.Math.Min(vfov, hfov);
+		float hfov = 2f * (float)Math.Atan(Math.Tan(vfov / 2f) * aspect);
+		float limitingFov = Math.Min(vfov, hfov);
 		Console.WriteLine($"[CameraFit] aspect={aspect:F3} vfovDeg={MathUtil.RadiansToDegrees(vfov):F1} hfovDeg={MathUtil.RadiansToDegrees(hfov):F1} limitingFovDeg={MathUtil.RadiansToDegrees(limitingFov):F1}");
 
-		float distance = radius / (float)System.Math.Sin(System.Math.Max(0.1f, limitingFov / 2f));
+		float distance = radius / (float)Math.Sin(Math.Max(0.1f, limitingFov / 2f));
 		float margin = 1.25f;
 		distance *= margin;
 		Console.WriteLine($"[CameraFit] radius={radius:F2} distance={distance:F2}");
 
-		Vector3 dir = Vector3.Normalize(new Vector3(1f, -(float)System.Math.Sqrt(2), 1f));
+		Vector3 dir = Vector3.Normalize(new Vector3(1f, -(float)Math.Sqrt(2), 1f));
 		Vector3 position = center - dir * distance;
 		Console.WriteLine($"[CameraFit] dir=({dir.X:F3},{dir.Y:F3},{dir.Z:F3}) position=({position.X:F2},{position.Y:F2},{position.Z:F2}) center=({center.X:F2},{center.Y:F2},{center.Z:F2})");
 
 		Vector3 fwd = Vector3.Normalize(center - position);
-		float yaw = (float)System.Math.Atan2(fwd.X, fwd.Z);
-		float pitch = (float)System.Math.Asin(fwd.Y);
+		float yaw = (float)Math.Atan2(fwd.X, fwd.Z);
+		float pitch = (float)Math.Asin(fwd.Y);
 		float appliedYaw = yaw + MathUtil.Pi;
-		float appliedPitch = -System.Math.Abs(pitch);
+		float appliedPitch = -Math.Abs(pitch);
 		Quaternion rotation = Quaternion.RotationYawPitchRoll(appliedYaw, appliedPitch, 0f);
 		Console.WriteLine($"[CameraFit] yawDeg={MathUtil.RadiansToDegrees(appliedYaw):F1} pitchDeg={MathUtil.RadiansToDegrees(appliedPitch):F1} (applied, yaw+180, downward pitch)");
 

@@ -4,7 +4,7 @@ using CodeChangeVisualizer.Analyzer;
 
 public class FileDifferTests
 {
-	private static LineGroup LG(LineType type, int length, int start = 0) =>
+	private static LineGroup Lg(LineType type, int length, int start = 0) =>
 		new LineGroup { Type = type, Length = length, Start = start };
 
 	[Fact]
@@ -30,9 +30,9 @@ public class FileDifferTests
 	public void Modify_ShouldReturnModifyWithEdits()
 	{
 		FileAnalysis oldFa = new FileAnalysis
-			{ File = "a.cs", Lines = new List<LineGroup> { FileDifferTests.LG(LineType.Code, 3) } };
+			{ File = "a.cs", Lines = new List<LineGroup> { FileDifferTests.Lg(LineType.Code, 3) } };
 		FileAnalysis newFa = new FileAnalysis
-			{ File = "a.cs", Lines = new List<LineGroup> { FileDifferTests.LG(LineType.Code, 5) } };
+			{ File = "a.cs", Lines = new List<LineGroup> { FileDifferTests.Lg(LineType.Code, 5) } };
 
 		FileDiff fileDiff = FileDiffer.DiffFile(oldFa, newFa);
 		Assert.Equal(FileChangeKind.Modify, fileDiff.Kind);
