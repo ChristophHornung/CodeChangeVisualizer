@@ -147,7 +147,7 @@ public static class GitHistoryAnalyzer
 							{
 								// Log the error but continue with other files
 								Console.WriteLine(
-									$"Warning: Failed to analyze file '{repoPath}' at commit '{sha}': {ex.Message}");
+									$"Warning: Failed to analyze file '{repoPath}' at commit '{sha}': {ex}");
 							}
 							finally
 							{
@@ -234,7 +234,7 @@ public static class GitHistoryAnalyzer
 									{
 										// Log the error but continue with other files
 										Console.WriteLine(
-											$"Warning: Failed to analyze file '{path}' at commit '{sha}': {ex.Message}");
+											$"Warning: Failed to analyze file '{path}' at commit '{sha}': {ex}");
 										results.Add((path, null, null, true));
 										return;
 									}

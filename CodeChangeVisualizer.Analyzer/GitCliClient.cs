@@ -261,14 +261,13 @@ public sealed class GitCliClient : IGitClient
 			string path = repoRelativePath.Replace('\\', '/');
 			// Quote the path component to support spaces and special characters
 			string quoted = path.Replace("\"", "\\\"");
-			string arguments = $"show {sha}:\"{quoted}\"";
+			string arguments = $"show --textconv {sha}:\"{quoted}\"";
 			string content;
 			try
 			{
 				content = await this.RunGitAsync(arguments, workingDirectory);
 			}
-			catch (Exception firstEx) when (firstEx.Message.Contains("does not exist") ||
-			                                firstEx.Message.Contains("not found"))
+			catch (Exception firstEx)
 			{
 				// Determine current subdirectory prefix relative to repo root and try alternative path variant
 				string prefix = string.Empty;
@@ -301,16 +300,81 @@ public sealed class GitCliClient : IGitClient
 				}
 
 				string altQuoted = altPath.Replace("\"", "\\\"");
-				string altArgs = $"show {sha}:\"{altQuoted}\"";
+				string altArgs = $"show --textconv {sha}:\"{altQuoted}\"";
 				try
 				{
 					content = await this.RunGitAsync(altArgs, workingDirectory);
 				}
 				catch (Exception secondEx)
 				{
-					throw new FileNotFoundException(
-						$"File '{repoRelativePath}' not found at commit '{sha}'. Tried paths: '{path}', '{altPath}'.",
-						secondEx);
+					// Attempt a case-insensitive lookup within the directory at this commit (Windows-friendly)
+					try
+					{
+						string dirPart = altPath;
+						int lastSlash = altPath.LastIndexOf('/') >= 0
+							? altPath.LastIndexOf('/')
+							: altPath.LastIndexOf('\\');
+						string fileName = altPath;
+						if (lastSlash >= 0)
+						{
+							dirPart = altPath.Substring(0, lastSlash);
+							fileName = altPath.Substring(lastSlash + 1);
+						}
+
+						string dirArg = string.IsNullOrWhiteSpace(dirPart) ? "." : dirPart.Replace('\\', '/');
+						// Use a full-tree listing to avoid missing files due to subdirectory pathspec mismatches
+						string list = await this.RunGitAsync($"ls-tree -r --name-only --full-tree {sha}",
+							workingDirectory);
+						var entries = list.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+							.Select(GitCliClient.NormalizePath)
+							.ToList();
+						// Try to find exact path ignoring case
+						string? ciMatch = entries.FirstOrDefault(e =>
+							string.Equals(e, altPath, StringComparison.OrdinalIgnoreCase));
+						if (ciMatch != null)
+						{
+							string ciQuoted = ciMatch.Replace("\"", "\\\"");
+							string ciArgs = $"show --textconv {sha}:\"{ciQuoted}\"";
+							content = await this.RunGitAsync(ciArgs, workingDirectory);
+						}
+						else
+						{
+							// Try a unique suffix match (handles when the workingDirectory is a subdir and entries are repo-root relative)
+							var suffixMatches = entries
+								.Where(e => e.EndsWith("/" + altPath, StringComparison.OrdinalIgnoreCase)).ToList();
+							if (suffixMatches.Count == 1)
+							{
+								string chosen = suffixMatches[0];
+								string chosenQuoted = chosen.Replace("\"", "\\\"");
+								string chosenArgs = $"show --textconv {sha}:\"{chosenQuoted}\"";
+								content = await this.RunGitAsync(chosenArgs, workingDirectory);
+							}
+							else
+							{
+								// Build a few similar candidates to help diagnostics
+								var similar = entries.Where(e =>
+										e.EndsWith("/" + fileName, StringComparison.OrdinalIgnoreCase) ||
+										string.Equals(Path.GetFileName(e), fileName,
+											StringComparison.OrdinalIgnoreCase))
+									.Take(5)
+									.ToList();
+								string similarList = similar.Count > 0 ? string.Join(", ", similar) : "<none>";
+								throw new FileNotFoundException(
+									$"File '{repoRelativePath}' not found at commit '{sha}'. Tried paths: '{path}', '{altPath}'. Similar in commit: {similarList}",
+									secondEx);
+							}
+						}
+					}
+					catch (FileNotFoundException)
+					{
+						throw;
+					}
+					catch (Exception diagEx)
+					{
+						throw new FileNotFoundException(
+							$"File '{repoRelativePath}' not found at commit '{sha}'. Tried paths: '{path}', '{altPath}'. Additional lookup failed: {diagEx.Message}",
+							secondEx);
+					}
 				}
 			}
 
