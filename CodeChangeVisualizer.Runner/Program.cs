@@ -77,6 +77,9 @@ public class Program
 					}
 
 					break;
+				case "--hideprogress":
+					config.HideProgress = true;
+					break;
 				default:
 					// If no flag is provided, treat as directory path (backward compatibility)
 					if (config.Directory == null)
@@ -124,11 +127,20 @@ public class Program
 			if (!string.IsNullOrWhiteSpace(config.GitStart))
 			{
 				// Advanced git mode
-				RevisionLog log = await GitHistoryAnalyzer.RunAdvancedGitAnalysisAsync(
-					config.Directory!,
-					config.GitStart!,
-					config.IgnorePatterns.Count > 0 ? config.IgnorePatterns : null,
-					config.FileExtensions.Count > 0 ? config.FileExtensions : null);
+				RevisionLog log;
+				if (!config.HideProgress)
+				{
+					// Use Spectre.Console progress to display analysis progress
+					log = await SpectreHelper.RunWithProgressAsync(config);
+				}
+				else
+				{
+					log = await GitHistoryAnalyzer.RunAdvancedGitAnalysisAsync(
+						config.Directory!,
+						config.GitStart!,
+						config.IgnorePatterns.Count > 0 ? config.IgnorePatterns : null,
+						config.FileExtensions.Count > 0 ? config.FileExtensions : null);
+				}
 				string json = JsonSerializer.Serialize(log, new JsonSerializerOptions
 				{
 					WriteIndented = true,
@@ -226,7 +238,8 @@ public class Program
 			OutputToConsole = commandLineConfig.OutputToConsole || fileConfig.OutputToConsole,
 			IgnorePatterns = new List<string>(fileConfig.IgnorePatterns),
 			FileExtensions = new List<string>(fileConfig.FileExtensions),
-			GitStart = commandLineConfig.GitStart ?? fileConfig.GitStart
+			GitStart = commandLineConfig.GitStart ?? fileConfig.GitStart,
+			HideProgress = commandLineConfig.HideProgress || fileConfig.HideProgress
 		};
 
 		// Add command line ignore patterns
@@ -252,6 +265,8 @@ public class Program
 		Console.WriteLine("  -i, --ignore <pattern>     Regex pattern to ignore files (can be used multiple times)");
 		Console.WriteLine(
 			"      --git-start <hash>     Advanced mode: analyze all revisions from <hash> to current HEAD");
+		Console.WriteLine(
+			"      --hideprogress         Hide Spectre.Console progress during advanced git analysis (shown by default)");
 		Console.WriteLine("  -h, --help                 Show this help message");
 		Console.WriteLine();
 		Console.WriteLine("Configuration File Format:");
@@ -265,7 +280,8 @@ public class Program
 		Console.WriteLine("      \".*\\\\.generated\\\\.cs$\"");
 		Console.WriteLine("    ],");
 		Console.WriteLine("    \"fileExtensions\": [\"*.cs\", \"*.vb\"],");
-		Console.WriteLine("    \"gitStart\": null");
+		Console.WriteLine("    \"gitStart\": null,");
+		Console.WriteLine("    \"hideProgress\": false");
 		Console.WriteLine("  }");
 		Console.WriteLine();
 		Console.WriteLine("Examples:");

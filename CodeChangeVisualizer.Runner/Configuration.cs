@@ -25,4 +25,8 @@ public class Configuration
 	// Advanced git analysis start commit hash (enables git mode when provided)
 	[JsonPropertyName("gitStart")]
 	public string? GitStart { get; set; }
+
+	// Hide console progress (Spectre.Console) during advanced git analysis; default false (progress shown)
+	[JsonPropertyName("hideProgress")]
+	public bool HideProgress { get; set; }
 }

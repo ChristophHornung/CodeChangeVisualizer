@@ -24,7 +24,8 @@ public static class GitHistoryAnalyzer
 		string workingDirectory,
 		string gitStart,
 		List<string>? ignorePatterns = null,
-		List<string>? fileExtensions = null)
+		List<string>? fileExtensions = null,
+		IProgress<GitAnalysisProgress>? progress = null)
 	{
 		ArgumentNullException.ThrowIfNull(workingDirectory);
 		ArgumentNullException.ThrowIfNull(gitStart);
@@ -36,7 +37,7 @@ public static class GitHistoryAnalyzer
 
 		IGitClient git = new GitCliClient();
 		return await GitHistoryAnalyzer.RunAdvancedGitAnalysisAsync(git, workingDirectory, gitStart, ignorePatterns,
-			fileExtensions);
+			fileExtensions, progress);
 	}
 
 	/// <summary>
@@ -56,7 +57,8 @@ public static class GitHistoryAnalyzer
 		string workingDirectory,
 		string gitStart,
 		List<string>? ignorePatterns = null,
-		List<string>? fileExtensions = null)
+		List<string>? fileExtensions = null,
+		IProgress<GitAnalysisProgress>? progress = null)
 	{
 		ArgumentNullException.ThrowIfNull(git);
 		ArgumentNullException.ThrowIfNull(workingDirectory);
@@ -95,6 +97,7 @@ public static class GitHistoryAnalyzer
 			throw new InvalidOperationException($"No commits found between '{startSha}' and '{headSha}'.");
 		}
 
+		progress?.Report(new GitAnalysisProgress { Kind = "CommitsTotal", Total = commits.Count });
 		RevisionLog log = new RevisionLog();
 
 		// Normalize filters
@@ -108,6 +111,7 @@ public static class GitHistoryAnalyzer
 		{
 			string sha = commits[idx];
 			CodeAnalyzer analyzer = new CodeAnalyzer();
+			progress?.Report(new GitAnalysisProgress { Kind = "CommitStarted", Commit = sha, Value = idx + 1 });
 
 			if (prevMap == null)
 			{
@@ -115,6 +119,8 @@ public static class GitHistoryAnalyzer
 				List<string> allFiles = await git.ListFilesAtCommitAsync(workDir, sha);
 				List<string> filesToAnalyze = GitHistoryAnalyzer.FilterByExtensionsAndIgnores(allFiles, exts, ignores);
 				List<FileAnalysis> current = new List<FileAnalysis>(filesToAnalyze.Count);
+				progress?.Report(new GitAnalysisProgress
+					{ Kind = "FilesTotal", Commit = sha, Total = filesToAnalyze.Count });
 				
 				foreach (string repoPath in filesToAnalyze)
 				{
@@ -130,12 +136,19 @@ public static class GitHistoryAnalyzer
 						// Log the error but continue with other files
 						Console.WriteLine($"Warning: Failed to analyze file '{repoPath}' at commit '{sha}': {ex.Message}");
 					}
+					finally
+					{
+						// Always advance progress regardless of success to keep counts consistent
+						progress?.Report(new GitAnalysisProgress
+							{ Kind = "FileProcessed", Commit = sha, File = repoPath });
+					}
 				}
 
 				// Deterministic ordering
 				current = current.OrderBy(f => f.File, StringComparer.OrdinalIgnoreCase).ToList();
 				log.Revisions.Add(new RevisionEntry { Commit = sha, Analysis = current });
 				prevMap = current.ToDictionary(f => f.File, f => f, StringComparer.OrdinalIgnoreCase);
+				progress?.Report(new GitAnalysisProgress { Kind = "CommitCompleted", Commit = sha, Value = idx + 1 });
 			}
 			else
 			{
@@ -166,7 +179,9 @@ public static class GitHistoryAnalyzer
 					changes.Select(c => c.Path).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 				List<string> filteredPaths =
 					GitHistoryAnalyzer.FilterByExtensionsAndIgnores(changePaths, exts, ignores);
-
+				progress?.Report(new GitAnalysisProgress
+					{ Kind = "FilesTotal", Commit = sha, Total = filteredPaths.Count });
+				
 				List<FileChangeEntry> diffEntries = new();
 				Dictionary<string, FileAnalysis> nextMap = new(prevMap, StringComparer.OrdinalIgnoreCase);
 
@@ -216,12 +231,15 @@ public static class GitHistoryAnalyzer
 					{
 						nextMap[path] = newFa;
 					}
-				}
 
+					progress?.Report(new GitAnalysisProgress { Kind = "FileProcessed", Commit = sha, File = path });
+				}
+				
 				// Deterministic ordering
 				diffEntries = diffEntries.OrderBy(e => e.File, StringComparer.OrdinalIgnoreCase).ToList();
 				log.Revisions.Add(new RevisionEntry { Commit = sha, Diff = diffEntries });
 				prevMap = nextMap;
+				progress?.Report(new GitAnalysisProgress { Kind = "CommitCompleted", Commit = sha, Value = idx + 1 });
 			}
 		}
 

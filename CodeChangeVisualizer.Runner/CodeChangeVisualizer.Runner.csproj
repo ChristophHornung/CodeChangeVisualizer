@@ -3,6 +3,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\CodeChangeVisualizer.Analyzer\CodeChangeVisualizer.Analyzer.csproj"/>
 		<ProjectReference Include="..\CodeChangeVisualizer.Viewer\CodeChangeVisualizer.Viewer.csproj"/>
+		<PackageReference Include="Spectre.Console"/>
 	</ItemGroup>
 
 	<PropertyGroup>
