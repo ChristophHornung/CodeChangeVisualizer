@@ -259,12 +259,66 @@ public sealed class GitCliClient : IGitClient
 		try
 		{
 			string path = repoRelativePath.Replace('\\', '/');
-			string content = await this.RunGitAsync($"show {sha}:{path}", workingDirectory);
+			// Quote the path component to support spaces and special characters
+			string quoted = path.Replace("\"", "\\\"");
+			string arguments = $"show {sha}:\"{quoted}\"";
+			string content;
+			try
+			{
+				content = await this.RunGitAsync(arguments, workingDirectory);
+			}
+			catch (Exception firstEx) when (firstEx.Message.Contains("does not exist") ||
+			                                firstEx.Message.Contains("not found"))
+			{
+				// Determine current subdirectory prefix relative to repo root and try alternative path variant
+				string prefix = string.Empty;
+				try
+				{
+					prefix = (await this.RunGitAsync("rev-parse --show-prefix", workingDirectory)).Trim()
+						.Replace('\\', '/');
+				}
+				catch
+				{
+					prefix = string.Empty;
+				}
+
+				if (!string.IsNullOrEmpty(prefix) && !prefix.EndsWith('/'))
+				{
+					prefix += "/";
+				}
+
+				string altPath = path;
+				if (!string.IsNullOrEmpty(prefix))
+				{
+					if (altPath.StartsWith(prefix, StringComparison.Ordinal))
+					{
+						altPath = altPath.Substring(prefix.Length);
+					}
+					else
+					{
+						altPath = prefix + altPath;
+					}
+				}
+
+				string altQuoted = altPath.Replace("\"", "\\\"");
+				string altArgs = $"show {sha}:\"{altQuoted}\"";
+				try
+				{
+					content = await this.RunGitAsync(altArgs, workingDirectory);
+				}
+				catch (Exception secondEx)
+				{
+					throw new FileNotFoundException(
+						$"File '{repoRelativePath}' not found at commit '{sha}'. Tried paths: '{path}', '{altPath}'.",
+						secondEx);
+				}
+			}
+
 			return new MemoryStream(Encoding.UTF8.GetBytes(content), writable: false);
 		}
-		catch (Exception ex) when (ex.Message.Contains("does not exist") || ex.Message.Contains("not found"))
+		catch (FileNotFoundException)
 		{
-			throw new FileNotFoundException($"File '{repoRelativePath}' not found at commit '{sha}'.", ex);
+			throw;
 		}
 		catch (Exception ex)
 		{

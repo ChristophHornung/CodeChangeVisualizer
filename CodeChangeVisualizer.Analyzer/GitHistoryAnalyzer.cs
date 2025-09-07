@@ -1,5 +1,6 @@
 ﻿namespace CodeChangeVisualizer.Analyzer;
 
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 
 /// <summary>
@@ -121,31 +122,47 @@ public static class GitHistoryAnalyzer
 				List<FileAnalysis> current = new List<FileAnalysis>(filesToAnalyze.Count);
 				progress?.Report(new GitAnalysisProgress
 					{ Kind = "FilesTotal", Commit = sha, Total = filesToAnalyze.Count });
-				
-				foreach (string repoPath in filesToAnalyze)
+
+				// Parallelize per-file analysis with bounded concurrency
+				var bag = new ConcurrentBag<FileAnalysis>();
+				int degree = Math.Max(1, Environment.ProcessorCount);
+				using (var sem = new SemaphoreSlim(degree, degree))
 				{
-					try
+					List<Task> tasks = new List<Task>(filesToAnalyze.Count);
+					foreach (string repoPath in filesToAnalyze)
 					{
-						using Stream stream = await git.OpenFileAsync(workDir, sha, repoPath);
-						FileAnalysis fa = await analyzer.AnalyzeFileAsync(stream, repoPath);
-						fa.File = repoPath.Replace('\\', '/');
-						current.Add(fa);
+						await sem.WaitAsync().ConfigureAwait(false);
+						tasks.Add(Task.Run(async () =>
+						{
+							try
+							{
+								IGitClient localGit = git; // capture
+								using Stream stream = await localGit.OpenFileAsync(workDir, sha, repoPath);
+								var localAnalyzer = new CodeAnalyzer();
+								FileAnalysis fa = await localAnalyzer.AnalyzeFileAsync(stream, repoPath);
+								fa.File = repoPath.Replace('\\', '/');
+								bag.Add(fa);
+							}
+							catch (Exception ex)
+							{
+								// Log the error but continue with other files
+								Console.WriteLine(
+									$"Warning: Failed to analyze file '{repoPath}' at commit '{sha}': {ex.Message}");
+							}
+							finally
+							{
+								progress?.Report(new GitAnalysisProgress
+									{ Kind = "FileProcessed", Commit = sha, File = repoPath });
+								sem.Release();
+							}
+						}));
 					}
-					catch (Exception ex)
-					{
-						// Log the error but continue with other files
-						Console.WriteLine($"Warning: Failed to analyze file '{repoPath}' at commit '{sha}': {ex.Message}");
-					}
-					finally
-					{
-						// Always advance progress regardless of success to keep counts consistent
-						progress?.Report(new GitAnalysisProgress
-							{ Kind = "FileProcessed", Commit = sha, File = repoPath });
-					}
+
+					await Task.WhenAll(tasks).ConfigureAwait(false);
 				}
 
 				// Deterministic ordering
-				current = current.OrderBy(f => f.File, StringComparer.OrdinalIgnoreCase).ToList();
+				current = bag.OrderBy(f => f.File, StringComparer.OrdinalIgnoreCase).ToList();
 				log.Revisions.Add(new RevisionEntry { Commit = sha, Analysis = current });
 				prevMap = current.ToDictionary(f => f.File, f => f, StringComparer.OrdinalIgnoreCase);
 				progress?.Report(new GitAnalysisProgress { Kind = "CommitCompleted", Commit = sha, Value = idx + 1 });
@@ -183,60 +200,91 @@ public static class GitHistoryAnalyzer
 					{ Kind = "FilesTotal", Commit = sha, Total = filteredPaths.Count });
 				
 				List<FileChangeEntry> diffEntries = new();
-				Dictionary<string, FileAnalysis> nextMap = new(prevMap, StringComparer.OrdinalIgnoreCase);
-
-				foreach (string path in filteredPaths)
+				// We'll build nextMap after parallel work to avoid concurrent mutations
+				var results = new ConcurrentBag<(string path, FileAnalysis? newFa, FileDiff? fd, bool skipEntry)>();
+				int degree2 = Math.Max(1, Environment.ProcessorCount);
+				using (var sem2 = new SemaphoreSlim(degree2, degree2))
 				{
-					GitChangeKind lastKind = changes
-						.Last(c => string.Equals(c.Path, path, StringComparison.OrdinalIgnoreCase)).Kind;
-
-					prevMap.TryGetValue(path, out FileAnalysis? oldFa);
-					FileAnalysis newFa;
-					
-					if (lastKind == GitChangeKind.Delete)
+					List<Task> tasks2 = new List<Task>(filteredPaths.Count);
+					foreach (string path in filteredPaths)
 					{
-						newFa = new FileAnalysis { File = path, Lines = new List<LineGroup>() };
-					}
-					else
-					{
-						try
+						await sem2.WaitAsync().ConfigureAwait(false);
+						tasks2.Add(Task.Run(async () =>
 						{
-							using Stream stream = await git.OpenFileAsync(workDir, sha, path);
-							newFa = await analyzer.AnalyzeFileAsync(stream, path);
-						}
-						catch (Exception ex)
-						{
-							// Log the error but continue with other files
-							Console.WriteLine($"Warning: Failed to analyze file '{path}' at commit '{sha}': {ex.Message}");
-							continue;
-						}
+							try
+							{
+								GitChangeKind lastKind = changes.Last(c =>
+									string.Equals(c.Path, path, StringComparison.OrdinalIgnoreCase)).Kind;
+								prevMap.TryGetValue(path, out FileAnalysis? oldFaLocal);
+								FileAnalysis newFaLocal;
+								if (lastKind == GitChangeKind.Delete)
+								{
+									newFaLocal = new FileAnalysis { File = path, Lines = new List<LineGroup>() };
+								}
+								else
+								{
+									try
+									{
+										IGitClient localGit = git;
+										using Stream stream = await localGit.OpenFileAsync(workDir, sha, path);
+										var localAnalyzer = new CodeAnalyzer();
+										newFaLocal = await localAnalyzer.AnalyzeFileAsync(stream, path);
+									}
+									catch (Exception ex)
+									{
+										// Log the error but continue with other files
+										Console.WriteLine(
+											$"Warning: Failed to analyze file '{path}' at commit '{sha}': {ex.Message}");
+										results.Add((path, null, null, true));
+										return;
+									}
+								}
+
+								oldFaLocal ??= new FileAnalysis { File = path, Lines = new List<LineGroup>() };
+								FileDiff fdLocal = FileDiffer.DiffFile(oldFaLocal, newFaLocal);
+								bool skip = fdLocal.Kind == FileChangeKind.Modify &&
+								            (fdLocal.Edits == null || fdLocal.Edits.Count == 0);
+								results.Add((path, newFaLocal, fdLocal, skip));
+							}
+							finally
+							{
+								progress?.Report(new GitAnalysisProgress
+									{ Kind = "FileProcessed", Commit = sha, File = path });
+								sem2.Release();
+							}
+						}));
 					}
 
-					oldFa ??= new FileAnalysis { File = path, Lines = new List<LineGroup>() };
-					FileDiff fd = FileDiffer.DiffFile(oldFa, newFa);
+					await Task.WhenAll(tasks2).ConfigureAwait(false);
+				}
 
-					// Skip no-op modify (no edits)
-					if (fd.Kind != FileChangeKind.Modify || (fd.Edits != null && fd.Edits.Count > 0))
+				// Build diff entries deterministically
+				diffEntries = results
+					.Where(r => !r.skipEntry && r.fd != null)
+					.Select(r => new FileChangeEntry { File = r.path, Change = FileAnalysisDiff.FromFileDiff(r.fd!) })
+					.OrderBy(e => e.File, StringComparer.OrdinalIgnoreCase)
+					.ToList();
+
+				// Build next map from prevMap and results (deterministic updates)
+				Dictionary<string, FileAnalysis> nextMap = new(prevMap, StringComparer.OrdinalIgnoreCase);
+				foreach (var r in results)
+				{
+					if (r.fd == null)
 					{
-						diffEntries.Add(new FileChangeEntry
-							{ File = path, Change = FileAnalysisDiff.FromFileDiff(fd) });
+						// error case already logged; skip map update
+						continue;
 					}
 
-					// Update next map according to kind
-					if (fd.Kind == FileChangeKind.FileDelete)
+					if (r.fd.Kind == FileChangeKind.FileDelete)
 					{
-						nextMap.Remove(path);
+						nextMap.Remove(r.path);
 					}
-					else
+					else if (r.newFa != null)
 					{
-						nextMap[path] = newFa;
+						nextMap[r.path] = r.newFa;
 					}
-
-					progress?.Report(new GitAnalysisProgress { Kind = "FileProcessed", Commit = sha, File = path });
 				}
 				
-				// Deterministic ordering
-				diffEntries = diffEntries.OrderBy(e => e.File, StringComparer.OrdinalIgnoreCase).ToList();
 				log.Revisions.Add(new RevisionEntry { Commit = sha, Diff = diffEntries });
 				prevMap = nextMap;
 				progress?.Report(new GitAnalysisProgress { Kind = "CommitCompleted", Commit = sha, Value = idx + 1 });
