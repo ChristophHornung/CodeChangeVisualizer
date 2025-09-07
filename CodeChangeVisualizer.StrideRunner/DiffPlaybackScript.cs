@@ -753,7 +753,7 @@ public class DiffPlaybackScript : SyncScript
 			var game = this.Game as Game;
 			if (game != null)
 			{
-				var createOptions = new Primitive3DCreationOptions
+				Bepu3DPhysicsOptions createOptions = new() 
 					{ Size = new Vector3(1f, 1f, 1f), IncludeCollider = false };
 				Entity temp = game.Create3DPrimitive(PrimitiveModelType.Cube, createOptions);
 				var modelComp = temp.Get<ModelComponent>();

@@ -47,7 +47,7 @@ public class SkyscraperVisualizer
 		}
 
 		// Create a 1x1x1 cube once and reuse its Model
-		var createOptions = new Primitive3DCreationOptions { Size = new Vector3(1f, 1f, 1f), IncludeCollider = false };
+		var createOptions = new Bepu3DPhysicsOptions { Size = new Vector3(1f, 1f, 1f), IncludeCollider = false };
 		Entity temp = game.Create3DPrimitive(PrimitiveModelType.Cube, createOptions);
 		var modelComp = temp.Get<ModelComponent>();
 		SkyscraperVisualizer.sUnitCubeModel = modelComp?.Model;

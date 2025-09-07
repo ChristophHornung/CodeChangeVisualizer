@@ -232,7 +232,7 @@ internal class Program
 		if (ground == null)
 		{
 			// Create a very large, thin cube as ground so its top sits at Y=0
-			var options = new Primitive3DCreationOptions
+			Bepu3DPhysicsOptions options = new()
 				{ Size = new Vector3(groundSize, groundThickness, groundSize), IncludeCollider = false };
 			Entity plane = game.Create3DPrimitive(PrimitiveModelType.Cube, options);
 			plane.Name = "Ground";
